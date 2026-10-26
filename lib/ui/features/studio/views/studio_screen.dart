@@ -101,11 +101,11 @@ class StudioScreen extends StatelessWidget {
             size: 22,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'wavectl_host  •  Waveshare SK18 Custom Button Studio',
+              'wavectl_host  •  Waveshare ${viewModel.activeDeviceModel.code} Custom Button Studio',
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 15,
                 letterSpacing: 0.3,

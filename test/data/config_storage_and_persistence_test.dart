@@ -10,6 +10,7 @@ import 'package:wavectl_host/data/services/config_storage_service.dart';
 import 'package:wavectl_host/data/services/host_launcher_service.dart';
 import 'package:wavectl_host/data/services/serial_transport_service.dart';
 import 'package:wavectl_host/domain/models/button_action.dart';
+import 'package:wavectl_host/domain/models/sk18_geometry.dart';
 import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
 import 'package:wavectl_host/ui/features/studio/view_models/studio_view_model.dart';
 
@@ -163,8 +164,8 @@ void main() {
       repo1.setSelectedPort('simulator://custom-unit');
       repo1.setInteractiveTriggerOnTap(true);
 
-      // Create a second profile and switch back to the first profile, page 2
-      repo1.createProfile('Gaming Profile');
+      // Create an additional profile (on top of seeded SK18 + MK10) and switch back to the first profile, page 2
+      repo1.createProfile('Gaming Profile', model: WaveshareModel.mk10);
       repo1.selectProfile(0);
       repo1.selectPage(2);
 
@@ -179,6 +180,7 @@ void main() {
       final deviceRepo2 = _TestDeviceRepository(
         discoveredPorts: const [
           SerialPortDiscovery.simulatorPortUri,
+          SerialPortDiscovery.mk10SimulatorPortUri,
           'simulator://custom-unit',
         ],
       );
@@ -201,8 +203,12 @@ void main() {
         envFilePath: '/non/existent/.env',
       );
 
-      expect(vm2.profiles.length, equals(2));
-      expect(vm2.profiles[1].name, equals('Gaming Profile'));
+      expect(vm2.profiles.length, equals(3));
+      expect(vm2.profiles[0].deviceModel, equals(WaveshareModel.sk18));
+      expect(vm2.profiles[1].deviceModel, equals(WaveshareModel.mk10));
+      expect(vm2.profiles[2].name, equals('Gaming Profile'));
+      expect(vm2.profiles[2].deviceModel, equals(WaveshareModel.mk10));
+      expect(vm2.profiles[2].pages.first.keys.length, equals(10));
       expect(vm2.activeProfileIndex, equals(0));
       expect(vm2.activePageIndex, equals(2));
       expect(vm2.activePage.name, equals('Streaming Controls'));

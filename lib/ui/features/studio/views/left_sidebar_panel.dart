@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../data/services/serial_transport_service.dart';
+import '../../../../domain/models/sk18_geometry.dart';
 import '../../../core/theme/app_theme.dart';
 import '../view_models/studio_view_model.dart';
 
@@ -60,11 +62,11 @@ class LeftSidebarPanel extends StatelessWidget {
                   color: AppTheme.primaryAccent,
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'SK18 Device',
+                    '${viewModel.activeDeviceModel.code} Device',
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -106,9 +108,11 @@ class LeftSidebarPanel extends StatelessWidget {
                     (p) => DropdownMenuItem<String>(
                       value: p,
                       child: Text(
-                        p == 'simulator://sk18'
+                        p == SerialPortDiscovery.simulatorPortUri
                             ? 'Virtual SK18 Simulator'
-                            : p,
+                            : (p == SerialPortDiscovery.mk10SimulatorPortUri
+                                  ? 'Virtual MK10 Simulator'
+                                  : p),
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12),
                       ),
@@ -168,6 +172,8 @@ class LeftSidebarPanel extends StatelessWidget {
   Widget _buildProfilesAndPagesSection(BuildContext context) {
     final profiles = viewModel.profiles;
     final pages = viewModel.activeProfile.pages;
+    final activeModel = viewModel.activeDeviceModel;
+    final spec = viewModel.activeModelSpec;
 
     return Card(
       child: Padding(
@@ -195,11 +201,12 @@ class LeftSidebarPanel extends StatelessWidget {
                 ),
                 IconButton(
                   key: const Key('add_profile_btn'),
-                  tooltip: 'Create New Profile',
+                  tooltip: 'Create New ${activeModel.code} Profile',
                   visualDensity: VisualDensity.compact,
                   onPressed: () {
                     viewModel.createNewProfile(
-                      'Profile ${profiles.length + 1}',
+                      '${activeModel.code} Profile ${profiles.length + 1}',
+                      model: activeModel,
                     );
                   },
                   icon: const Icon(Icons.create_new_folder_outlined, size: 18),
@@ -207,15 +214,43 @@ class LeftSidebarPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ChoiceChip(
+                  key: const Key('device_model_sk18_chip'),
+                  label: const Text(
+                    'SK18 (18 Keys)',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  selected: activeModel == WaveshareModel.sk18,
+                  onSelected: (_) =>
+                      viewModel.switchDeviceModel(WaveshareModel.sk18),
+                ),
+                ChoiceChip(
+                  key: const Key('device_model_mk10_chip'),
+                  label: const Text(
+                    'MK10 (10 Keys)',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  selected: activeModel == WaveshareModel.mk10,
+                  onSelected: (_) =>
+                      viewModel.switchDeviceModel(WaveshareModel.mk10),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             DropdownButtonFormField<int>(
               key: const Key('profile_selector_dropdown'),
               initialValue: viewModel.activeProfileIndex,
               isExpanded: true,
               items: List.generate(profiles.length, (idx) {
+                final p = profiles[idx];
                 return DropdownMenuItem<int>(
                   value: idx,
                   child: Text(
-                    profiles[idx].name,
+                    '[${p.deviceModel.code}] ${p.name}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13),
                   ),
@@ -230,11 +265,11 @@ class LeftSidebarPanel extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Pages (18 keys/page)',
+                    'Pages (${spec.totalKeys} keys/page)',
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       color: Colors.white70,
                       fontWeight: FontWeight.w600,
@@ -299,6 +334,7 @@ class LeftSidebarPanel extends StatelessWidget {
   ) {
     final isLandscape = viewModel.activeProfile.landscapeMode;
     final isUpsideDown = viewModel.activeProfile.upsideDown;
+    final spec = viewModel.activeModelSpec;
 
     return Card(
       child: Padding(
@@ -331,7 +367,9 @@ class LeftSidebarPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    isLandscape ? 'Landscape (6x3)' : 'Portrait (3x6)',
+                    isLandscape
+                        ? 'Landscape (${spec.landscapeCols}x${spec.landscapeRows})'
+                        : 'Portrait (${spec.portraitCols}x${spec.portraitRows})',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12),
                   ),

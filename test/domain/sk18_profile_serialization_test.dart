@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wavectl_host/domain/models/button_action.dart';
+import 'package:wavectl_host/domain/models/sk18_geometry.dart';
 import 'package:wavectl_host/domain/models/sk18_profile.dart';
 
 void main() {
@@ -82,6 +83,26 @@ void main() {
       expect(firstKey.action.launcherType, equals(HostLauncherType.app));
       expect(firstKey.action.target, equals('kitty'));
       expect(firstKey.action.args, equals(['--single-instance']));
+      expect(profile.deviceModel, equals(WaveshareModel.sk18));
+    });
+
+    test('round-trips MK10 10-key profile with deviceModel == MK10', () {
+      final mk10Profile = Sk18Profile.createDefaultMk10();
+      expect(mk10Profile.deviceModel, equals(WaveshareModel.mk10));
+      expect(mk10Profile.pages.length, equals(2));
+      expect(mk10Profile.pages.first.keys.length, equals(10));
+      expect(mk10Profile.pages.last.keys.length, equals(10));
+
+      final jsonMap = mk10Profile.toSk18ConfigJson(pageIndex: 0);
+      expect(jsonMap['deviceModel'], equals('MK10'));
+
+      final restored = Sk18Profile.fromJson(
+        jsonDecode(jsonEncode(jsonMap)) as Map<String, dynamic>,
+      );
+      expect(restored.deviceModel, equals(WaveshareModel.mk10));
+      expect(restored.pages.first.keys.length, equals(10));
+      expect(restored.pages.first.keys[9].col, equals(4));
+      expect(restored.pages.first.keys[9].row, equals(1));
     });
   });
 }

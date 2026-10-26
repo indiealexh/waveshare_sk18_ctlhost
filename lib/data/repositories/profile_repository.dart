@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../domain/models/key_button_config.dart';
+import '../../domain/models/sk18_geometry.dart';
 import '../../domain/models/sk18_profile.dart';
 import '../services/config_storage_service.dart';
 import '../services/serial_transport_service.dart';
@@ -33,6 +34,7 @@ class ProfileRepository {
       _profiles.addAll(initialProfiles);
     } else {
       _profiles.add(Sk18Profile.createDefault());
+      _profiles.add(Sk18Profile.createDefaultMk10());
     }
   }
 
@@ -76,12 +78,14 @@ class ProfileRepository {
     }
   }
 
-  Sk18Profile createProfile(String name) {
+  Sk18Profile createProfile(String name, {WaveshareModel? model}) {
+    final targetModel = model ?? activeProfile.deviceModel;
     final newProfile = Sk18Profile(
       id: 'profile_${DateTime.now().millisecondsSinceEpoch}',
       name: name.trim().isEmpty
-          ? 'Profile ${_profiles.length + 1}'
+          ? '${targetModel.code} Profile ${_profiles.length + 1}'
           : name.trim(),
+      deviceModel: targetModel,
       landscapeMode: activeProfile.landscapeMode,
       upsideDown: activeProfile.upsideDown,
       backlight: activeProfile.backlight,
@@ -93,6 +97,7 @@ class ProfileRepository {
           id: 'page_1',
           name: 'Page 1',
           landscapeMode: activeProfile.landscapeMode,
+          model: targetModel,
         ),
       ],
     );
@@ -103,6 +108,27 @@ class ProfileRepository {
     return newProfile;
   }
 
+  /// Selects the first profile matching [model], or seeds the built-in default
+  /// profile for [model] if none exists yet.
+  Sk18Profile selectOrCreateProfileForModel(WaveshareModel model) {
+    if (activeProfile.deviceModel == model) {
+      return activeProfile;
+    }
+    final existingIdx = _profiles.indexWhere((p) => p.deviceModel == model);
+    if (existingIdx >= 0) {
+      selectProfile(existingIdx);
+      return activeProfile;
+    }
+    final seeded = model == WaveshareModel.mk10
+        ? Sk18Profile.createDefaultMk10()
+        : Sk18Profile.createDefault();
+    _profiles.add(seeded);
+    _activeProfileIndex = _profiles.length - 1;
+    _activePageIndex = 0;
+    _scheduleAutoSave();
+    return activeProfile;
+  }
+
   Sk18Page addPage(String name) {
     final currentPages = List<Sk18Page>.from(activeProfile.pages);
     final newPage = Sk18Page.empty(
@@ -111,6 +137,7 @@ class ProfileRepository {
           ? 'Page ${currentPages.length + 1}'
           : name.trim(),
       landscapeMode: activeProfile.landscapeMode,
+      model: activeProfile.deviceModel,
     );
     currentPages.add(newPage);
     _profiles[_activeProfileIndex] = activeProfile.copyWith(pages: currentPages);

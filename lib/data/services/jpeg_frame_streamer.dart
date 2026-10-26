@@ -6,6 +6,7 @@ import 'package:image/image.dart' as img;
 
 import '../../domain/models/ha_entity_state.dart';
 import '../../domain/models/sk18_device_info.dart';
+import '../../domain/models/sk18_geometry.dart';
 import '../../domain/models/sk18_profile.dart';
 import '../../ui/core/rendering/sk18_canvas_painter.dart';
 import 'sk18_rpc_client.dart';
@@ -98,12 +99,13 @@ class JpegFrameStreamer {
     return Isolate.run(() => _encodeRgbaToBaselineJpegInIsolate(request));
   }
 
-  /// Convenience helper that rasterizes the SK18 canvas on the GPU (with 90°
+  /// Convenience helper that rasterizes the SK18 or MK10 canvas on the GPU (with 90°
   /// pre-rotation when targeting a portrait framebuffer) and encodes a baseline JPEG.
   static Future<Uint8List> renderPageToJpeg({
     required Sk18Page page,
     required bool authoringInLandscape,
     required bool rotateForPortraitDevice,
+    WaveshareModel model = WaveshareModel.sk18,
     bool upsideDown = false,
     Map<String, HaEntityState> haEntities = const {},
     Set<int> pressedKeyIndices = const {},
@@ -120,6 +122,7 @@ class JpegFrameStreamer {
       page: page,
       authoringInLandscape: authoringInLandscape,
       rotateForPortraitDevice: rotateForPortraitDevice,
+      model: model,
       upsideDown: upsideDown,
       haEntities: haEntities,
       pressedKeyIndices: pressedKeyIndices,
@@ -180,6 +183,7 @@ class JpegFrameStreamer {
   Future<void> _trySendNextDirtyFrame() async {
     if (!_isDirty ||
         !rpcClient.isConnected ||
+        rpcClient.isV1Protocol ||
         isPausedForUpload ||
         _isEncodingFrame ||
         _waitingForFrameAck) {

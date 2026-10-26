@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../../domain/models/sk18_device_info.dart';
+import '../../domain/models/sk18_geometry.dart';
 import 'protocol_v2_codec.dart';
 
 abstract class Sk18Transport {
@@ -20,8 +21,15 @@ abstract class Sk18Transport {
 
 class SerialPortDiscovery {
   static const String simulatorPortUri = 'simulator://sk18';
+  static const String mk10SimulatorPortUri = 'simulator://mk10';
 
   const SerialPortDiscovery._();
+
+  static bool isSimulatorUri(String port) =>
+      port.trim().toLowerCase().startsWith('simulator://');
+
+  static String simulatorPortForModel(WaveshareModel model) =>
+      model == WaveshareModel.mk10 ? mk10SimulatorPortUri : simulatorPortUri;
 
   /// Normalizes macOS `/dev/tty.*` dial-in device paths to `/dev/cu.*` call-out
   /// paths so `open(2)` never blocks waiting for hardware Data Carrier Detect (DCD).
@@ -33,8 +41,8 @@ class SerialPortDiscovery {
     return trimmed;
   }
 
-  /// Discovers candidate SK18 serial ports across macOS (`/dev/cu.usbmodem*`)
-  /// and Linux (`/dev/ttyACM*`), always including the virtual simulator option.
+  /// Discovers candidate SK18 / MK10 serial ports across macOS (`/dev/cu.usbmodem*`)
+  /// and Linux (`/dev/ttyACM*`), always including the virtual simulator options.
   static Future<List<String>> discoverPorts() async {
     final ports = <String>[];
     try {
@@ -66,6 +74,9 @@ class SerialPortDiscovery {
     ports.sort();
     if (!ports.contains(simulatorPortUri)) {
       ports.add(simulatorPortUri);
+    }
+    if (!ports.contains(mk10SimulatorPortUri)) {
+      ports.add(mk10SimulatorPortUri);
     }
     return ports;
   }
@@ -157,6 +168,7 @@ class PosixSerialTransport implements Sk18Transport {
       throw StateError('Serial port is not connected.');
     }
     activeRaf.writeFromSync(bytes);
+    activeRaf.flushSync();
   }
 
   @override
@@ -215,6 +227,7 @@ class SimulatorSerialTransport implements Sk18Transport {
   bool _connected = false;
   String _activePortPath = '';
   final bool simulatePortraitScanout;
+  WaveshareModel? simulatedModel;
 
   int simulatedBacklight = 85;
   int simulatedVolume = 5;
@@ -245,7 +258,22 @@ class SimulatorSerialTransport implements Sk18Transport {
     ),
   };
 
-  SimulatorSerialTransport({this.simulatePortraitScanout = true});
+  SimulatorSerialTransport({
+    this.simulatePortraitScanout = true,
+    this.simulatedModel,
+  });
+
+  WaveshareModel get effectiveModel {
+    if (simulatedModel != null) {
+      return simulatedModel!;
+    }
+    final lowerPort = _activePortPath.trim().toLowerCase();
+    if (lowerPort == SerialPortDiscovery.mk10SimulatorPortUri ||
+        lowerPort.contains('mk10')) {
+      return WaveshareModel.mk10;
+    }
+    return WaveshareModel.sk18;
+  }
 
   @override
   Stream<Uint8List> get incomingBytes => _incomingController.stream;
@@ -323,9 +351,16 @@ class SimulatorSerialTransport implements Sk18Transport {
 
       switch (method) {
         case 'getInfo':
-          final info = simulatePortraitScanout
-              ? Sk18DeviceInfo.defaultPortrait()
-              : Sk18DeviceInfo.defaultLandscape();
+          final Sk18DeviceInfo info;
+          if (effectiveModel == WaveshareModel.mk10) {
+            info = simulatePortraitScanout
+                ? Sk18DeviceInfo.defaultMk10Portrait()
+                : Sk18DeviceInfo.defaultMk10Landscape();
+          } else {
+            info = simulatePortraitScanout
+                ? Sk18DeviceInfo.defaultPortrait()
+                : Sk18DeviceInfo.defaultLandscape();
+          }
           _sendJsonResponse(
             id: pkt.id,
             ackMethod: 'getInfo',

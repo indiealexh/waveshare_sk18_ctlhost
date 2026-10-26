@@ -1,3 +1,5 @@
+import 'sk18_geometry.dart';
+
 class Sk18KeyRect {
   final int col;
   final int row;
@@ -95,6 +97,7 @@ class Sk18DeviceInfo {
   });
 
   bool get isPortrait => deviceHeight > deviceWidth;
+  WaveshareModel get model => WaveshareModel.fromString(deviceModel);
 
   factory Sk18DeviceInfo.defaultPortrait() {
     final rects = <Sk18KeyRect>[];
@@ -150,6 +153,94 @@ class Sk18DeviceInfo {
     );
   }
 
+  /// Mirrors the stock `V2.32` `MK10` `foregroundParam` (portrait, `rotate = 1`):
+  /// `304x896` panel, `5 rows x 2 cols` of `128 px` keys packed from
+  /// `startX = 0, startY = 256` (no gutters), plus the `296x240` side screen
+  /// at the top (`isKey = false`).
+  factory Sk18DeviceInfo.defaultMk10Portrait() {
+    final rects = <Sk18KeyRect>[
+      const Sk18KeyRect(
+        col: 0,
+        row: 0,
+        x: 0,
+        y: 0,
+        width: 296,
+        height: 240,
+        isKey: false,
+      ),
+    ];
+    for (int row = 0; row < 5; row++) {
+      for (int col = 0; col < 2; col++) {
+        rects.add(
+          Sk18KeyRect(
+            col: col,
+            row: row,
+            x: 128 * col,
+            y: 256 + 128 * row,
+            width: 128,
+            height: 128,
+            isKey: true,
+          ),
+        );
+      }
+    }
+    return Sk18DeviceInfo(
+      deviceVersion: 'V2.32',
+      deviceModel: 'MK10',
+      deviceWidth: 304,
+      deviceHeight: 896,
+      screenWidth: 304,
+      screenHeight: 896,
+      rectRows: 5,
+      rectCols: 2,
+      rects: rects,
+    );
+  }
+
+  /// Mirrors the stock `V2.32` `MK10` `foregroundParam` (landscape,
+  /// `rotate = 0`): `896x304` panel, `2 rows x 5 cols` of `128 px` keys packed
+  /// from `startX = 0, startY = 0` (no gutters), plus the `240x296` side screen
+  /// at `x = 656` (`isKey = false`).
+  factory Sk18DeviceInfo.defaultMk10Landscape() {
+    final rects = <Sk18KeyRect>[
+      const Sk18KeyRect(
+        col: 0,
+        row: 0,
+        x: 656,
+        y: 0,
+        width: 240,
+        height: 296,
+        isKey: false,
+      ),
+    ];
+    for (int row = 0; row < 2; row++) {
+      for (int col = 0; col < 5; col++) {
+        rects.add(
+          Sk18KeyRect(
+            col: col,
+            row: row,
+            x: 128 * col,
+            y: 128 * row,
+            width: 128,
+            height: 128,
+            isKey: true,
+          ),
+        );
+      }
+    }
+    return Sk18DeviceInfo(
+      deviceVersion: 'V2.32',
+      deviceModel: 'MK10',
+      deviceWidth: 896,
+      deviceHeight: 304,
+      screenWidth: 896,
+      screenHeight: 304,
+      rectRows: 2,
+      rectCols: 5,
+      rects: rects,
+    );
+  }
+
   factory Sk18DeviceInfo.fromGetInfoResult(Map<String, dynamic> result) {
     final panel =
         (result['devicePanel'] as Map<String, dynamic>?) ??
@@ -160,20 +251,52 @@ class Sk18DeviceInfo {
         .map(Sk18KeyRect.fromJson)
         .toList();
 
-    final devWidth = (result['deviceWidth'] as num?)?.toInt() ?? 720;
-    final devHeight = (result['deviceHeight'] as num?)?.toInt() ?? 1280;
+    final rawModel = result['deviceModel'] as String? ?? 'SK18';
+    final parsedModel = WaveshareModel.fromString(rawModel);
+    final spec = parsedModel.spec;
+
+    final devWidth =
+        (result['deviceWidth'] as num?)?.toInt() ?? spec.portraitWidth;
+    final devHeight =
+        (result['deviceHeight'] as num?)?.toInt() ?? spec.portraitHeight;
     final isPort = devHeight > devWidth;
 
     return Sk18DeviceInfo(
       deviceVersion: result['deviceVersion'] as String? ?? 'V2.32',
-      deviceModel: result['deviceModel'] as String? ?? 'SK18',
+      deviceModel: parsedModel.code,
       deviceWidth: devWidth,
       deviceHeight: devHeight,
       screenWidth: (panel['screenWidth'] as num?)?.toInt() ?? devWidth,
       screenHeight: (panel['screenHeight'] as num?)?.toInt() ?? devHeight,
-      rectRows: (panel['rectRows'] as num?)?.toInt() ?? (isPort ? 6 : 3),
-      rectCols: (panel['rectCols'] as num?)?.toInt() ?? (isPort ? 3 : 6),
+      rectRows:
+          (panel['rectRows'] as num?)?.toInt() ??
+          (isPort ? spec.portraitRows : spec.landscapeRows),
+      rectCols:
+          (panel['rectCols'] as num?)?.toInt() ??
+          (isPort ? spec.portraitCols : spec.landscapeCols),
       rects: rects,
+    );
+  }
+
+  factory Sk18DeviceInfo.fromV1ScreenMessage(Map<String, String> map) {
+    final rawModel =
+        map['screen_model'] ?? map['deviceModel'] ?? map['model'] ?? 'SK18';
+    final parsedModel = WaveshareModel.fromString(rawModel);
+    final base = parsedModel == WaveshareModel.mk10
+        ? Sk18DeviceInfo.defaultMk10Portrait()
+        : Sk18DeviceInfo.defaultPortrait();
+    final version =
+        map['version'] ?? map['deviceVersion'] ?? base.deviceVersion;
+    return Sk18DeviceInfo(
+      deviceVersion: version,
+      deviceModel: parsedModel.code,
+      deviceWidth: base.deviceWidth,
+      deviceHeight: base.deviceHeight,
+      screenWidth: base.screenWidth,
+      screenHeight: base.screenHeight,
+      rectRows: base.rectRows,
+      rectCols: base.rectCols,
+      rects: base.rects,
     );
   }
 

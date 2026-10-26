@@ -7,6 +7,7 @@ import 'package:wavectl_host/data/services/host_launcher_service.dart';
 import 'package:wavectl_host/data/services/jpeg_frame_streamer.dart';
 import 'package:wavectl_host/data/services/serial_transport_service.dart';
 import 'package:wavectl_host/domain/models/ha_entity_state.dart';
+import 'package:wavectl_host/domain/models/sk18_geometry.dart';
 import 'package:wavectl_host/domain/models/sk18_profile.dart';
 import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
 import 'package:wavectl_host/ui/core/rendering/sk18_canvas_painter.dart';
@@ -117,6 +118,48 @@ void main() {
         expect(deviceRepo.frameStreamer.framesSentCount, greaterThanOrEqualTo(1));
         expect(deviceRepo.simulatorTransport.framesReceivedCount, greaterThanOrEqualTo(1));
         expect(deviceRepo.simulatorTransport.lastFrameJpegBytes, isNotNull);
+
+        // 4. MK10 896x304 landscape and GPU pre-rotated 304x896 portrait rendering
+        final mk10Profile = Sk18Profile.createDefaultMk10();
+        final mk10Page = mk10Profile.pages.first;
+
+        final mk10LandscapeRaw = await Sk18CanvasRenderer.renderOffscreenRgba(
+          page: mk10Page,
+          authoringInLandscape: true,
+          rotateForPortraitDevice: false,
+          model: WaveshareModel.mk10,
+          haEntities: haEntities,
+          profileName: mk10Profile.name,
+        );
+        expect(mk10LandscapeRaw.width, equals(896));
+        expect(mk10LandscapeRaw.height, equals(304));
+
+        // Verify the side-screen rich telemetry card at x=656..896 renders a
+        // badge pixel (x=700, y=30) that differs from the plain background
+        // in the 16 px gutter between keys and side screen (x=648, y=150).
+        int pixelRgb(Sk18RawFrameBuffer buf, int x, int y) {
+          final offset = (y * buf.width + x) * 4;
+          return (buf.rgbaBytes[offset] << 16) |
+              (buf.rgbaBytes[offset + 1] << 8) |
+              buf.rgbaBytes[offset + 2];
+        }
+
+        final outerBgPixel = pixelRgb(mk10LandscapeRaw, 648, 150);
+        final headerCardPixel = pixelRgb(mk10LandscapeRaw, 700, 30);
+        expect(headerCardPixel, isNot(equals(outerBgPixel)));
+
+        final mk10RotatedJpeg = await JpegFrameStreamer.renderPageToJpeg(
+          page: mk10Page,
+          authoringInLandscape: true,
+          rotateForPortraitDevice: true,
+          model: WaveshareModel.mk10,
+          haEntities: haEntities,
+          useIsolate: false,
+        );
+        final decodedMk10Portrait = img.decodeJpg(mk10RotatedJpeg);
+        expect(decodedMk10Portrait, isNotNull);
+        expect(decodedMk10Portrait!.width, equals(304));
+        expect(decodedMk10Portrait.height, equals(896));
 
         vm.dispose();
         haRepo.dispose();

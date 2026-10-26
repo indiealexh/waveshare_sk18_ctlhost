@@ -8,7 +8,9 @@ import 'package:wavectl_host/data/repositories/home_assistant_repository.dart';
 import 'package:wavectl_host/data/repositories/profile_repository.dart';
 import 'package:wavectl_host/data/services/config_storage_service.dart';
 import 'package:wavectl_host/data/services/host_launcher_service.dart';
+import 'package:wavectl_host/data/services/serial_transport_service.dart';
 import 'package:wavectl_host/domain/models/button_action.dart';
+import 'package:wavectl_host/domain/models/sk18_geometry.dart';
 import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
 import 'package:wavectl_host/main.dart';
 import 'package:wavectl_host/ui/features/studio/view_models/studio_view_model.dart';
@@ -179,7 +181,50 @@ void main() {
       final errIcon = tester.widget<Icon>(find.byKey(const Key('status_bar_icon')));
       expect(errIcon.icon, equals(Icons.cancel_rounded));
 
-      // 8. Dispose widget tree and verify zero pending timers
+      // 8. Switch to Waveshare MK10 (10 keys, 896x304, 5x2) and verify bidirectional simulator sync
+      await tester.ensureVisible(find.byKey(const Key('device_model_mk10_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('device_model_mk10_chip')));
+      await tester.pumpAndSettle();
+
+      expect(viewModel.activeDeviceModel, equals(WaveshareModel.mk10));
+      expect(
+        viewModel.selectedPort,
+        equals(SerialPortDiscovery.mk10SimulatorPortUri),
+      );
+      expect(viewModel.deviceInfo.deviceModel, equals('MK10'));
+      expect(find.text('Pages (10 keys/page)'), findsOneWidget);
+      expect(find.text('Landscape (5x2)'), findsOneWidget);
+      expect(
+        find.text('MK10 Live LCD Preview (896×304)'),
+        findsOneWidget,
+      );
+
+      for (int i = 0; i < 10; i++) {
+        expect(find.byKey(Key('lcd_key_$i')), findsOneWidget);
+      }
+      expect(find.byKey(const Key('lcd_key_10')), findsNothing);
+
+      // Emit physical MK10 portrait key press at (col: 1, row: 0) -> logical K1 (Office Light toggle)
+      final lightBeforeMk10Press = haRepo.entities['light.office_main']?.state;
+      deviceRepo.simulatorTransport.emitPhysicalKeyStateChanged(
+        col: 1,
+        row: 0,
+        pressed: true,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        haRepo.entities['light.office_main']?.state,
+        isNot(equals(lightBeforeMk10Press)),
+      );
+      deviceRepo.simulatorTransport.emitPhysicalKeyStateChanged(
+        col: 1,
+        row: 0,
+        pressed: false,
+      );
+      await tester.pump();
+
+      // 9. Dispose widget tree and verify zero pending timers
       await tester.pumpWidget(const SizedBox.shrink());
       viewModel.dispose();
       haRepo.dispose();

@@ -182,5 +182,122 @@ void main() {
         equals(17),
       );
     });
+
+    test('computes exact MK10 landscape (896x304, 5x2) and portrait (304x896, 2x5) coordinates', () {
+      // Stock V2.32 MK10: 128 px keys packed 1:1 from the panel origin
+      // (no gutters); portrait keys start below the 296x240 side screen (y = 256).
+      final landscapeRects = Sk18Geometry.computeKeyRects(
+        isPortrait: false,
+        model: WaveshareModel.mk10,
+      );
+      expect(landscapeRects.length, equals(10));
+
+      final expectedLandscapeX = [0, 128, 256, 384, 512];
+      final expectedLandscapeY = [0, 128];
+
+      for (int row = 0; row < 2; row++) {
+        for (int col = 0; col < 5; col++) {
+          final index = row * 5 + col;
+          final r = landscapeRects[index];
+          expect(r.col, equals(col));
+          expect(r.row, equals(row));
+          expect(r.x, equals(expectedLandscapeX[col]));
+          expect(r.y, equals(expectedLandscapeY[row]));
+          expect(r.width, equals(128));
+          expect(r.height, equals(128));
+        }
+      }
+
+      final portraitRects = Sk18Geometry.computeKeyRects(
+        isPortrait: true,
+        model: WaveshareModel.mk10,
+      );
+      expect(portraitRects.length, equals(10));
+
+      final expectedPortraitX = [0, 128];
+      final expectedPortraitY = [256, 384, 512, 640, 768];
+
+      for (int row = 0; row < 5; row++) {
+        for (int col = 0; col < 2; col++) {
+          final index = row * 2 + col;
+          final r = portraitRects[index];
+          expect(r.col, equals(col));
+          expect(r.row, equals(row));
+          expect(r.x, equals(expectedPortraitX[col]));
+          expect(r.y, equals(expectedPortraitY[row]));
+          expect(r.width, equals(128));
+          expect(r.height, equals(128));
+        }
+      }
+    });
+
+    test('filters out non-key status rect (isKey: false) on MK10 and does not apply +12 px fix', () {
+      final mk10Portrait = Sk18DeviceInfo.defaultMk10Portrait();
+      expect(mk10Portrait.model, equals(WaveshareModel.mk10));
+      expect(mk10Portrait.rects.length, equals(11)); // 1 status rect + 10 keys
+      expect(mk10Portrait.rects.first.isKey, isFalse);
+
+      final computedPortrait = Sk18Geometry.computeKeyRects(
+        isPortrait: true,
+        rawDeviceRects: mk10Portrait.rects,
+        model: WaveshareModel.mk10,
+      );
+      expect(computedPortrait.length, equals(10));
+      expect(computedPortrait.first.x, equals(0));
+      expect(computedPortrait.first.y, equals(256));
+
+      final mk10Landscape = Sk18DeviceInfo.defaultMk10Landscape();
+      final computedLandscape = Sk18Geometry.computeKeyRects(
+        isPortrait: false,
+        rawDeviceRects: mk10Landscape.rects,
+        model: WaveshareModel.mk10,
+      );
+      expect(computedLandscape.length, equals(10));
+      expect(computedLandscape.first.x, equals(0));
+      expect(computedLandscape.first.y, equals(0));
+    });
+
+    test('remaps MK10 physical portrait events (2x5) to logical landscape (5x2) including upsideDown', () {
+      // Physical top-left landscape key K1 (logical col=0, row=0) on MK10 portrait (2 cols x 5 rows)
+      // corresponds to portrait col=1, row=0 because logicalRow = (2 - 1) - physCol = 1 - 1 = 0.
+      final mk10TopLeft = Sk18Geometry.remapKeyEvent(
+        col: 1,
+        row: 0,
+        fromPhysicalDevice: true,
+        deviceIsPortrait: true,
+        authoringInLandscape: true,
+        model: WaveshareModel.mk10,
+      );
+      expect(mk10TopLeft.col, equals(0));
+      expect(mk10TopLeft.row, equals(0));
+      expect(mk10TopLeft.index, equals(0));
+
+      // Physical bottom-right landscape key K10 (logical col=4, row=1) corresponds to portrait col=0, row=4.
+      final mk10BottomRight = Sk18Geometry.remapKeyEvent(
+        col: 0,
+        row: 4,
+        fromPhysicalDevice: true,
+        deviceIsPortrait: true,
+        authoringInLandscape: true,
+        model: WaveshareModel.mk10,
+      );
+      expect(mk10BottomRight.col, equals(4));
+      expect(mk10BottomRight.row, equals(1));
+      expect(mk10BottomRight.index, equals(9));
+
+      // Upside-down MK10 inverts portrait col=0, row=4 to K1 (col=0, row=0, index=0).
+      final mk10InvertedTopLeft = Sk18Geometry.remapKeyEvent(
+        col: 0,
+        row: 4,
+        fromPhysicalDevice: true,
+        deviceIsPortrait: true,
+        authoringInLandscape: true,
+        upsideDown: true,
+        model: WaveshareModel.mk10,
+      );
+      expect(mk10InvertedTopLeft.col, equals(0));
+      expect(mk10InvertedTopLeft.row, equals(0));
+      expect(mk10InvertedTopLeft.index, equals(0));
+    });
   });
 }

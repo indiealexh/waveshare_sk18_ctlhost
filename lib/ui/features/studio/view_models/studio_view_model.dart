@@ -74,6 +74,8 @@ class StudioViewModel extends ChangeNotifier {
   int get activePageIndex => _profileRepository.activePageIndex;
   Sk18Profile get activeProfile => _profileRepository.activeProfile;
   Sk18Page get activePage => _profileRepository.activePage;
+  WaveshareModel get activeDeviceModel => activeProfile.deviceModel;
+  DeviceModelSpec get activeModelSpec => activeProfile.deviceModel.spec;
 
   int get selectedKeyIndex => _selectedKeyIndex;
   KeyButtonConfig get selectedKeyConfig =>
@@ -119,6 +121,7 @@ class StudioViewModel extends ChangeNotifier {
       page: page,
       authoringInLandscape: profile.landscapeMode,
       rotateForPortraitDevice: devInfo.isPortrait,
+      model: profile.deviceModel,
       upsideDown: profile.upsideDown,
       haEntities: haEntities,
       pressedKeyIndices: pressedKeyIndices,
@@ -186,15 +189,30 @@ class StudioViewModel extends ChangeNotifier {
     try {
       _ensureFrameStreamerCallbackBound();
       final info = await _deviceRepository.connect(targetPort);
+      // Synchronize active profile with the connected hardware or model simulator
+      final isExplicitModelSim =
+          targetPort == SerialPortDiscovery.simulatorPortUri ||
+          targetPort == SerialPortDiscovery.mk10SimulatorPortUri;
+      if (!_deviceRepository.isSimulator || isExplicitModelSim) {
+        if (activeProfile.deviceModel != info.model) {
+          _profileRepository.selectOrCreateProfileForModel(info.model);
+          _selectedKeyIndex = 0;
+        }
+      }
+      _selectedKeyIndex = _selectedKeyIndex.clamp(
+        0,
+        activePage.keys.length - 1,
+      );
       _setStatus(
         _deviceRepository.isSimulator
-            ? 'Connected: Virtual SK18 (${info.deviceWidth}x${info.deviceHeight})'
+            ? 'Connected: Virtual ${info.deviceModel} (${info.deviceWidth}x${info.deviceHeight})'
             : 'Connected: ${info.deviceModel} ${info.deviceVersion} on $targetPort',
       );
+      _safeNotifyListeners();
     } catch (e) {
       _setStatus('Connection error: $e', isError: true);
+      _safeNotifyListeners(markCanvasDirty: false);
     }
-    _safeNotifyListeners();
   }
 
   Future<void> disconnectDevice() async {
@@ -213,8 +231,8 @@ class StudioViewModel extends ChangeNotifier {
           );
       _setStatus(
         usedCustomFirmwareRpc
-            ? 'Synced sk18_config.json to SK18'
-            : 'Synced layout & settings to SK18 (${deviceInfo.deviceVersion})',
+            ? 'Synced sk18_config.json to ${deviceInfo.deviceModel}'
+            : 'Synced layout & settings to ${deviceInfo.deviceModel} (${deviceInfo.deviceVersion})',
       );
     } catch (e) {
       _setStatus('Sync failed: $e', isError: true);
@@ -224,17 +242,56 @@ class StudioViewModel extends ChangeNotifier {
 
   // --- Profile & Page Management ---
 
+  void _syncVirtualSimulatorForActiveProfile() {
+    final isStandardSimPort =
+        _selectedPort == SerialPortDiscovery.simulatorPortUri ||
+        _selectedPort == SerialPortDiscovery.mk10SimulatorPortUri;
+    if (!isStandardSimPort) return;
+
+    final desiredPort = SerialPortDiscovery.simulatorPortForModel(
+      activeProfile.deviceModel,
+    );
+    if (_selectedPort != desiredPort &&
+        _deviceRepository.availablePorts.contains(desiredPort)) {
+      _selectedPort = desiredPort;
+      _profileRepository.setSelectedPort(desiredPort);
+      if (_deviceRepository.isConnected && _deviceRepository.isSimulator) {
+        unawaited(connectToPort(desiredPort));
+      }
+    }
+  }
+
+  Future<void> switchDeviceModel(WaveshareModel model) async {
+    _profileRepository.selectOrCreateProfileForModel(model);
+    _selectedKeyIndex = 0;
+    final desiredPort = SerialPortDiscovery.simulatorPortForModel(model);
+    final isStandardSimPort =
+        _selectedPort == SerialPortDiscovery.simulatorPortUri ||
+        _selectedPort == SerialPortDiscovery.mk10SimulatorPortUri;
+    if (isStandardSimPort &&
+        _deviceRepository.availablePorts.contains(desiredPort)) {
+      await connectToPort(desiredPort);
+      return;
+    }
+    _setStatus(
+      'Switched to ${model.code} profile "${activeProfile.name}"',
+    );
+    _safeNotifyListeners();
+  }
+
   void selectProfile(int index) {
     _profileRepository.selectProfile(index);
     _selectedKeyIndex = 0;
     _setStatus('Switched to profile "${activeProfile.name}"');
+    _syncVirtualSimulatorForActiveProfile();
     _safeNotifyListeners();
   }
 
-  void createNewProfile(String name) {
-    final created = _profileRepository.createProfile(name);
+  void createNewProfile(String name, {WaveshareModel? model}) {
+    final created = _profileRepository.createProfile(name, model: model);
     _selectedKeyIndex = 0;
     _setStatus('Created profile "${created.name}"');
+    _syncVirtualSimulatorForActiveProfile();
     _safeNotifyListeners();
   }
 
@@ -275,12 +332,13 @@ class StudioViewModel extends ChangeNotifier {
   // --- Device Settings & Calibration ---
 
   Future<void> setLandscapeMode(bool landscape) async {
+    final spec = activeModelSpec;
     final updated = activeProfile.copyWith(landscapeMode: landscape);
     _profileRepository.updateActiveProfile(updated);
     _setStatus(
       landscape
-          ? 'Orientation: Landscape (1280x720, 6x3)'
-          : 'Orientation: Portrait (720x1280, 3x6)',
+          ? 'Orientation: Landscape (${spec.landscapeWidth}x${spec.landscapeHeight}, ${spec.landscapeCols}x${spec.landscapeRows})'
+          : 'Orientation: Portrait (${spec.portraitWidth}x${spec.portraitHeight}, ${spec.portraitCols}x${spec.portraitRows})',
     );
     _safeNotifyListeners();
   }
@@ -337,7 +395,7 @@ class StudioViewModel extends ChangeNotifier {
   }
 
   void selectKey(int index) {
-    if (index < 0 || index >= Sk18Geometry.totalKeys) return;
+    if (index < 0 || index >= activePage.keys.length) return;
     _selectedKeyIndex = index;
     _safeNotifyListeners(markCanvasDirty: false);
   }
@@ -370,12 +428,12 @@ class StudioViewModel extends ChangeNotifier {
     updateSelectedKeyConfig(selectedKeyConfig.copyWith(action: action));
   }
 
-  /// Triggers a key action by logical index (`0..17`) and animates the key press highlight.
+  /// Triggers a key action by logical index (`0..totalKeys-1`) and animates the key press highlight.
   Future<ActionExecutionLog> triggerKeyByIndex(
     int index, {
     bool fromPhysicalDevice = false,
   }) async {
-    final safeIdx = index.clamp(0, Sk18Geometry.totalKeys - 1);
+    final safeIdx = index.clamp(0, activePage.keys.length - 1);
     final keyConfig = activePage.keys[safeIdx];
 
     _pressedKeyIndices.add(safeIdx);
@@ -506,21 +564,23 @@ class StudioViewModel extends ChangeNotifier {
           authoringInLandscape: activeProfile.landscapeMode,
           deviceRectCols: _deviceRepository.deviceInfo.rectCols,
           upsideDown: activeProfile.upsideDown,
+          model: activeProfile.deviceModel,
         );
+        final keyIndex = remapped.index.clamp(0, activePage.keys.length - 1);
 
         if (pressed) {
-          _pressedKeyIndices.add(remapped.index);
-          _selectedKeyIndex = remapped.index;
+          _pressedKeyIndices.add(keyIndex);
+          _selectedKeyIndex = keyIndex;
           _safeNotifyListeners();
-          final keyCfg = activePage.keys[remapped.index];
+          final keyCfg = activePage.keys[keyIndex];
           final log = await _actionExecutor.executeKeyAction(keyCfg);
           _setStatus(
-            'Physical K${remapped.index + 1}: ${log.summary}',
+            'Physical K${keyIndex + 1}: ${log.summary}',
             isError: !log.success,
           );
           _safeNotifyListeners();
         } else {
-          _pressedKeyIndices.remove(remapped.index);
+          _pressedKeyIndices.remove(keyIndex);
           _safeNotifyListeners();
         }
         break;

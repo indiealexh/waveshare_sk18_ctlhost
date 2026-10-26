@@ -5,7 +5,7 @@ import 'sk18_geometry.dart';
 class Sk18Page {
   final String id;
   final String name;
-  final List<KeyButtonConfig> keys; // Always 18 items
+  final List<KeyButtonConfig> keys; // 18 items for SK18, 10 items for MK10
 
   const Sk18Page({
     required this.id,
@@ -29,11 +29,11 @@ class Sk18Page {
     required String id,
     required String name,
     bool landscapeMode = true,
+    WaveshareModel model = WaveshareModel.sk18,
   }) {
-    final cols = landscapeMode
-        ? Sk18Geometry.landscapeCols
-        : Sk18Geometry.portraitCols;
-    final keys = List<KeyButtonConfig>.generate(Sk18Geometry.totalKeys, (index) {
+    final spec = model.spec;
+    final cols = landscapeMode ? spec.landscapeCols : spec.portraitCols;
+    final keys = List<KeyButtonConfig>.generate(spec.totalKeys, (index) {
       return KeyButtonConfig(
         index: index,
         col: index % cols,
@@ -49,23 +49,23 @@ class Sk18Page {
   factory Sk18Page.fromJson(
     Map<String, dynamic> json, {
     bool landscapeMode = true,
+    WaveshareModel model = WaveshareModel.sk18,
   }) {
-    final cols = landscapeMode
-        ? Sk18Geometry.landscapeCols
-        : Sk18Geometry.portraitCols;
+    final spec = model.spec;
+    final cols = landscapeMode ? spec.landscapeCols : spec.portraitCols;
     final rawKeys = (json['keys'] as List<dynamic>?) ?? const <dynamic>[];
     final parsedByIndex = <int, KeyButtonConfig>{};
     for (final item in rawKeys) {
       if (item is Map<String, dynamic>) {
         final cfg = KeyButtonConfig.fromJson(item);
-        if (cfg.index >= 0 && cfg.index < Sk18Geometry.totalKeys) {
+        if (cfg.index >= 0 && cfg.index < spec.totalKeys) {
           parsedByIndex[cfg.index] = cfg;
         }
       }
     }
 
     final normalizedKeys = List<KeyButtonConfig>.generate(
-      Sk18Geometry.totalKeys,
+      spec.totalKeys,
       (idx) =>
           parsedByIndex[idx] ??
           KeyButtonConfig(
@@ -95,6 +95,7 @@ class Sk18Page {
 class Sk18Profile {
   final String id;
   final String name;
+  final WaveshareModel deviceModel;
   final bool landscapeMode;
   final bool upsideDown;
   final int backlight; // 0..100
@@ -106,6 +107,7 @@ class Sk18Profile {
   const Sk18Profile({
     required this.id,
     required this.name,
+    this.deviceModel = WaveshareModel.sk18,
     this.landscapeMode = true,
     this.upsideDown = false,
     this.backlight = 85,
@@ -118,6 +120,7 @@ class Sk18Profile {
   Sk18Profile copyWith({
     String? id,
     String? name,
+    WaveshareModel? deviceModel,
     bool? landscapeMode,
     bool? upsideDown,
     int? backlight,
@@ -129,6 +132,7 @@ class Sk18Profile {
     return Sk18Profile(
       id: id ?? this.id,
       name: name ?? this.name,
+      deviceModel: deviceModel ?? this.deviceModel,
       landscapeMode: landscapeMode ?? this.landscapeMode,
       upsideDown: upsideDown ?? this.upsideDown,
       backlight: (backlight ?? this.backlight).clamp(0, 100),
@@ -140,7 +144,7 @@ class Sk18Profile {
   }
 
   /// Serializes the active page (and full profile metadata) into the shared
-  /// `/mnt/SDCARD/sk18_config.json` format expected by the SK18 custom firmware
+  /// `/mnt/SDCARD/sk18_config.json` format expected by the SK18/MK10 custom firmware
   /// and companion JSON import/export.
   Map<String, dynamic> toSk18ConfigJson({
     int pageIndex = 0,
@@ -151,15 +155,22 @@ class Sk18Profile {
         ? 0
         : pageIndex.clamp(0, pages.length - 1);
     final activeKeys = pages.isEmpty
-        ? Sk18Page.empty(id: 'page_1', name: 'Main').keys
+        ? Sk18Page.empty(
+            id: 'page_1',
+            name: 'Main',
+            landscapeMode: landscapeMode,
+            model: deviceModel,
+          ).keys
         : pages[safeIndex].keys;
 
     return {
       'version': 1,
       'profileId': id,
       'profileName': name,
+      'deviceModel': deviceModel.code,
       'activePageIndex': safeIndex,
       'device': {
+        'deviceModel': deviceModel.code,
         'backlight': backlight.clamp(0, 100),
         'volume': volume.clamp(0, 7),
         'landscapeMode': landscapeMode,
@@ -179,6 +190,10 @@ class Sk18Profile {
   factory Sk18Profile.fromJson(Map<String, dynamic> json) {
     final deviceMap =
         (json['device'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+    final rawModel =
+        (json['deviceModel'] as String?) ??
+        (deviceMap['deviceModel'] as String?);
+    final model = WaveshareModel.fromString(rawModel);
     final landscape =
         (json['landscapeMode'] as bool?) ??
         (deviceMap['landscapeMode'] as bool?) ??
@@ -202,7 +217,13 @@ class Sk18Profile {
     if (rawPages is List && rawPages.isNotEmpty) {
       parsedPages = rawPages
           .whereType<Map<String, dynamic>>()
-          .map((p) => Sk18Page.fromJson(p, landscapeMode: landscape))
+          .map(
+            (p) => Sk18Page.fromJson(
+              p,
+              landscapeMode: landscape,
+              model: model,
+            ),
+          )
           .toList();
     } else if (json['keys'] is List) {
       parsedPages = [
@@ -213,6 +234,7 @@ class Sk18Profile {
             'keys': json['keys'],
           },
           landscapeMode: landscape,
+          model: model,
         ),
       ];
     }
@@ -223,6 +245,7 @@ class Sk18Profile {
           id: 'page_1',
           name: 'Main Page',
           landscapeMode: landscape,
+          model: model,
         ),
       ];
     }
@@ -234,6 +257,7 @@ class Sk18Profile {
       name:
           (json['name'] as String? ?? json['profileName'] as String?) ??
           'Default Studio',
+      deviceModel: model,
       landscapeMode: landscape,
       upsideDown: upsideDown,
       backlight: backlight.clamp(0, 100),
@@ -504,6 +528,174 @@ class Sk18Profile {
     return Sk18Profile(
       id: 'profile_studio',
       name: 'SK18 Master Studio',
+      deviceModel: WaveshareModel.sk18,
+      landscapeMode: true,
+      backlight: 85,
+      volume: 5,
+      offsetX: 0,
+      offsetY: 0,
+      pages: [
+        Sk18Page(
+          id: 'page_main',
+          name: 'Smart Desk & Dev',
+          keys: mainPageKeys,
+        ),
+        secondPage,
+      ],
+    );
+  }
+
+  factory Sk18Profile.createDefaultMk10() {
+    final mainPageKeys = <KeyButtonConfig>[
+      const KeyButtonConfig(
+        index: 0,
+        col: 0,
+        row: 0,
+        label: 'Office Light',
+        iconName: 'lightbulb',
+        colorHex: 0xFFFFB300,
+        action: ButtonAction(
+          category: ActionCategory.homeAssistant,
+          haType: HaActionType.toggle,
+          entityId: 'light.office_main',
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 1,
+        col: 1,
+        row: 0,
+        label: 'Bright +10%',
+        iconName: 'sun',
+        colorHex: 0xFFF59E0B,
+        action: ButtonAction(
+          category: ActionCategory.homeAssistant,
+          haType: HaActionType.brightnessUp,
+          entityId: 'light.office_main',
+          step: 10,
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 2,
+        col: 2,
+        row: 0,
+        label: 'Studio AC',
+        iconName: 'thermostat',
+        colorHex: 0xFF06B6D4,
+        action: ButtonAction(
+          category: ActionCategory.homeAssistant,
+          haType: HaActionType.hvacMode,
+          entityId: 'climate.studio_hvac',
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 3,
+        col: 3,
+        row: 0,
+        label: 'Temp +0.5°',
+        iconName: 'temp_up',
+        colorHex: 0xFFEF4444,
+        action: ButtonAction(
+          category: ActionCategory.homeAssistant,
+          haType: HaActionType.hvacTempUp,
+          entityId: 'climate.studio_hvac',
+          step: 0.5,
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 4,
+        col: 4,
+        row: 0,
+        label: 'Desk Fan',
+        iconName: 'power',
+        colorHex: 0xFF06B6D4,
+        action: ButtonAction(
+          category: ActionCategory.homeAssistant,
+          haType: HaActionType.toggle,
+          entityId: 'switch.desk_fan',
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 5,
+        col: 0,
+        row: 1,
+        label: 'Terminal',
+        iconName: 'terminal',
+        colorHex: 0xFF10B981,
+        action: ButtonAction(
+          category: ActionCategory.hostLauncher,
+          launcherType: HostLauncherType.app,
+          target: 'Terminal',
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 6,
+        col: 1,
+        row: 1,
+        label: 'Git Status',
+        iconName: 'code',
+        colorHex: 0xFF14B8A6,
+        action: ButtonAction(
+          category: ActionCategory.hostLauncher,
+          launcherType: HostLauncherType.script,
+          target: 'git status --short',
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 7,
+        col: 2,
+        row: 1,
+        label: 'Deploy Macro',
+        iconName: 'bolt',
+        colorHex: 0xFFEC4899,
+        action: ButtonAction(
+          category: ActionCategory.macro,
+          macroType: MacroActionType.sequence,
+          sequenceSteps: [
+            MacroStep(type: MacroStepType.text, value: 'flutter test'),
+            MacroStep(type: MacroStepType.delayMs, value: '50'),
+            MacroStep(type: MacroStepType.keyTap, value: 'ENTER'),
+          ],
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 8,
+        col: 3,
+        row: 1,
+        label: 'Click SFX',
+        iconName: 'speaker',
+        colorHex: 0xFFF97316,
+        action: ButtonAction(
+          category: ActionCategory.audio,
+          audioFilePath: '/data/sound/click.wav',
+        ),
+      ),
+      const KeyButtonConfig(
+        index: 9,
+        col: 4,
+        row: 1,
+        label: 'Build All',
+        iconName: 'play',
+        colorHex: 0xFF38BDF8,
+        action: ButtonAction(
+          category: ActionCategory.macro,
+          macroType: MacroActionType.hotkey,
+          keycode: 0x0005, // KC_B
+          modifiers: ['LGUI', 'LSFT'],
+        ),
+      ),
+    ];
+
+    final secondPage = Sk18Page.empty(
+      id: 'page_media',
+      name: 'Media & Stream',
+      landscapeMode: true,
+      model: WaveshareModel.mk10,
+    );
+
+    return Sk18Profile(
+      id: 'profile_mk10_studio',
+      name: 'MK10 Master Studio',
+      deviceModel: WaveshareModel.mk10,
       landscapeMode: true,
       backlight: 85,
       volume: 5,

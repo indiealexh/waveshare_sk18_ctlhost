@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/sk18_geometry.dart';
@@ -17,19 +19,23 @@ class CenterCanvasPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = viewModel.activeProfile;
     final page = viewModel.activePage;
+    final model = profile.deviceModel;
+    final spec = model.spec;
     final isPortrait = !profile.landscapeMode;
     final logicalWidth = isPortrait
-        ? Sk18Geometry.portraitWidth.toDouble()
-        : Sk18Geometry.landscapeWidth.toDouble();
+        ? spec.portraitWidth.toDouble()
+        : spec.landscapeWidth.toDouble();
     final logicalHeight = isPortrait
-        ? Sk18Geometry.portraitHeight.toDouble()
-        : Sk18Geometry.landscapeHeight.toDouble();
+        ? spec.portraitHeight.toDouble()
+        : spec.landscapeHeight.toDouble();
 
     final keyRects = Sk18Geometry.computeKeyRects(
       isPortrait: isPortrait,
       offsetX: profile.offsetX,
       offsetY: profile.offsetY,
+      model: model,
     );
+    final keyCount = math.min(keyRects.length, page.keys.length);
 
     return Container(
       color: AppTheme.studioBackground,
@@ -72,6 +78,8 @@ class CenterCanvasPanel extends StatelessWidget {
                             painter: Sk18CanvasPainter(
                               page: page,
                               isPortrait: isPortrait,
+                              model: model,
+                              upsideDown: profile.upsideDown,
                               haEntities: viewModel.haEntities,
                               pressedKeyIndices: viewModel.pressedKeyIndices,
                               selectedKeyIndex: viewModel.selectedKeyIndex,
@@ -86,8 +94,8 @@ class CenterCanvasPanel extends StatelessWidget {
                               clockString: viewModel.clockString,
                             ),
                           ),
-                          // Accessible interactive overlays for all 18 keys
-                          for (int i = 0; i < keyRects.length; i++)
+                          // Accessible interactive overlays for all keys (18 on SK18, 10 on MK10)
+                          for (int i = 0; i < keyCount; i++)
                             Positioned(
                               left: (keyRects[i].x * scaleX).clamp(
                                 0.0,
@@ -144,6 +152,11 @@ class CenterCanvasPanel extends StatelessWidget {
 
   Widget _buildCanvasToolbar(BuildContext context) {
     final selectedKey = viewModel.selectedKeyConfig;
+    final profile = viewModel.activeProfile;
+    final spec = profile.deviceModel.spec;
+    final resLabel = profile.landscapeMode
+        ? '${spec.landscapeWidth}×${spec.landscapeHeight}'
+        : '${spec.portraitWidth}×${spec.portraitHeight}';
 
     return Card(
       child: Padding(
@@ -165,7 +178,7 @@ class CenterCanvasPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'SK18 Live LCD Preview (${viewModel.activeProfile.landscapeMode ? '1280×720' : '720×1280'}${viewModel.activeProfile.upsideDown ? ' • Device Upside Down' : ''})',
+                    '${profile.deviceModel.code} Live LCD Preview ($resLabel${profile.upsideDown ? ' • Device Upside Down' : ''})',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,

@@ -15,7 +15,10 @@ class DeviceRepository {
 
   Sk18DeviceInfo _deviceInfo = Sk18DeviceInfo.defaultPortrait();
   List<Sk18WavFileEntry> _wavFiles = const [];
-  List<String> _availablePorts = const [SerialPortDiscovery.simulatorPortUri];
+  List<String> _availablePorts = const [
+    SerialPortDiscovery.simulatorPortUri,
+    SerialPortDiscovery.mk10SimulatorPortUri,
+  ];
 
   DeviceRepository({
     SimulatorSerialTransport? simulatorTransport,
@@ -59,9 +62,15 @@ class DeviceRepository {
       _rpcClient.setTransport(_posixTransport);
     }
 
-    _deviceInfo = await _rpcClient.connectAndHandshake(portPath);
-    await refreshWavFiles();
-    return _deviceInfo;
+    try {
+      _deviceInfo = await _rpcClient.connectAndHandshake(portPath);
+      await refreshWavFiles();
+      return _deviceInfo;
+    } catch (_) {
+      _wavFiles = const [];
+      await _rpcClient.disconnect();
+      rethrow;
+    }
   }
 
   Future<void> disconnect() async {
@@ -120,12 +129,13 @@ class DeviceRepository {
     await _rpcClient.stopAudio();
   }
 
-  /// Synchronizes the active profile to the SK18.
+  /// Synchronizes the active profile to the SK18 / MK10.
   ///
   /// Attempts custom companion firmware `setLayoutConfig` (`sk18_config.json`) first.
-  /// If the connected unit is running stock `V2.32` firmware (which responds with
-  /// `Unknown method: setLayoutConfig`), falls back to applying hardware backlight
-  /// and volume settings and streaming an immediate LCD frame.
+  /// If the connected unit is running stock `V2.32` firmware (or responds with
+  /// `Unknown method` / `Unsupported method` or times out on `setLayoutConfig`),
+  /// falls back to applying hardware backlight and volume settings and streaming
+  /// an immediate LCD frame.
   ///
   /// Returns `true` if `setLayoutConfig` succeeded on custom firmware, or `false`
   /// if the stock `V2.32` fallback was used.
@@ -136,6 +146,15 @@ class DeviceRepository {
     if (!isConnected) {
       throw StateError('SK18 device is not connected.');
     }
+
+    final isStockHardwareFirmware =
+        !isSimulator &&
+        _deviceInfo.deviceVersion.toUpperCase().startsWith('V2.');
+    if (isStockHardwareFirmware) {
+      await _applyStockFirmwareSync(profile);
+      return false;
+    }
+
     final config = profile.toSk18ConfigJson(pageIndex: pageIndex);
     try {
       await _rpcClient.setLayoutConfig(config);
@@ -144,15 +163,23 @@ class DeviceRepository {
       }
       return true;
     } on StateError catch (e) {
-      if (e.message.contains('Unknown method: setLayoutConfig')) {
-        await _rpcClient.setBacklight(profile.backlight);
-        await _rpcClient.setVolume(profile.volume);
-        if (!isSimulator) {
-          await _frameStreamer.markDirtyAndPump();
-        }
+      if (e.message.contains('Unknown method') ||
+          e.message.contains('Unsupported method')) {
+        await _applyStockFirmwareSync(profile);
         return false;
       }
       rethrow;
+    } on TimeoutException {
+      await _applyStockFirmwareSync(profile);
+      return false;
+    }
+  }
+
+  Future<void> _applyStockFirmwareSync(Sk18Profile profile) async {
+    await _rpcClient.setBacklight(profile.backlight);
+    await _rpcClient.setVolume(profile.volume);
+    if (!isSimulator) {
+      await _frameStreamer.markDirtyAndPump();
     }
   }
 
