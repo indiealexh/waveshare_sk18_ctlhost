@@ -51,7 +51,9 @@ class StudioViewModel extends ChangeNotifier {
   }) : _profileRepository = profileRepository,
        _deviceRepository = deviceRepository,
        _homeAssistantRepository = homeAssistantRepository,
-       _actionExecutor = actionExecutor {
+       _actionExecutor = actionExecutor,
+       _selectedPort = profileRepository.selectedPort,
+       _interactiveTriggerOnTap = profileRepository.interactiveTriggerOnTap {
     _updateClockString();
     _ensureFrameStreamerCallbackBound();
     _deviceEventSub = _deviceRepository.deviceEvents.listen(
@@ -142,10 +144,22 @@ class StudioViewModel extends ChangeNotifier {
     bool autoConnectSimulator = true,
     String envFilePath = '.env',
   }) async {
+    await _profileRepository.loadSavedConfig();
+    _selectedPort = _profileRepository.selectedPort;
+    _interactiveTriggerOnTap = _profileRepository.interactiveTriggerOnTap;
+
     await _deviceRepository.refreshPorts();
     await _homeAssistantRepository.initializeFromEnv(envFilePath: envFilePath);
     if (autoConnectSimulator) {
-      await connectToPort(SerialPortDiscovery.simulatorPortUri);
+      final restoredPort = _selectedPort;
+      final targetPort = _deviceRepository.availablePorts.contains(restoredPort)
+          ? restoredPort
+          : SerialPortDiscovery.simulatorPortUri;
+      await connectToPort(targetPort);
+      if (!_deviceRepository.isConnected &&
+          targetPort != SerialPortDiscovery.simulatorPortUri) {
+        await connectToPort(SerialPortDiscovery.simulatorPortUri);
+      }
     } else {
       _safeNotifyListeners();
     }
@@ -161,12 +175,14 @@ class StudioViewModel extends ChangeNotifier {
 
   void setSelectedPort(String port) {
     _selectedPort = port;
+    _profileRepository.setSelectedPort(port);
     _safeNotifyListeners(markCanvasDirty: false);
   }
 
   Future<void> connectToPort([String? portOverride]) async {
     final targetPort = portOverride ?? _selectedPort;
     _selectedPort = targetPort;
+    _profileRepository.setSelectedPort(targetPort);
     try {
       _ensureFrameStreamerCallbackBound();
       final info = await _deviceRepository.connect(targetPort);
@@ -316,6 +332,7 @@ class StudioViewModel extends ChangeNotifier {
 
   void setInteractiveTriggerOnTap(bool value) {
     _interactiveTriggerOnTap = value;
+    _profileRepository.setInteractiveTriggerOnTap(value);
     _safeNotifyListeners(markCanvasDirty: false);
   }
 
@@ -554,6 +571,7 @@ class StudioViewModel extends ChangeNotifier {
     }
     _releaseTimers.clear();
     _deviceEventSub?.cancel();
+    _profileRepository.dispose();
     super.dispose();
   }
 }

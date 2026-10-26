@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:wavectl_host/data/repositories/device_repository.dart';
 import 'package:wavectl_host/data/repositories/home_assistant_repository.dart';
 import 'package:wavectl_host/data/repositories/profile_repository.dart';
+import 'package:wavectl_host/data/services/config_storage_service.dart';
 import 'package:wavectl_host/data/services/host_launcher_service.dart';
 import 'package:wavectl_host/domain/models/button_action.dart';
 import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
@@ -180,6 +184,140 @@ void main() {
       viewModel.dispose();
       haRepo.dispose();
       deviceRepo.dispose();
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'Persists studio config on edit and restores keys, pages, and settings upon relaunch',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1440, 960);
+      tester.view.devicePixelRatio = 1.0;
+
+      late Directory tempDir;
+      late ConfigStorageService storageService;
+      await tester.runAsync(() async {
+        tempDir = await Directory.systemTemp.createTemp('wavectl_widget_cfg_');
+        storageService = ConfigStorageService(
+          configFilePath: p.join(tempDir.path, 'studio_config.json'),
+        );
+      });
+
+      addTearDown(() async {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        await tester.runAsync(() async {
+          if (await tempDir.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
+      });
+
+      // --- Launch 1: Customize key, add page, and adjust calibration ---
+      final profileRepo1 = ProfileRepository(storageService: storageService);
+      final deviceRepo1 = DeviceRepository(useBackgroundJpegIsolate: false);
+      final haRepo1 = HomeAssistantRepository();
+      final executor1 = ActionExecutorUseCase(
+        deviceRepository: deviceRepo1,
+        homeAssistantRepository: haRepo1,
+        hostLauncherService: HostLauncherService(dryRun: true),
+      );
+      final viewModel1 = StudioViewModel(
+        profileRepository: profileRepo1,
+        deviceRepository: deviceRepo1,
+        homeAssistantRepository: haRepo1,
+        actionExecutor: executor1,
+      );
+
+      await tester.runAsync(() async {
+        await viewModel1.initialize(
+          autoConnectSimulator: true,
+          envFilePath: '/non/existent/.env',
+        );
+      });
+
+      await tester.pumpWidget(
+        WavectlHostApp(
+          viewModel: viewModel1,
+          autoConnectSimulator: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Edit Key 0 label and icon
+      await tester.enterText(
+        find.byKey(const Key('key_label_field')),
+        'Saved Macro Key',
+      );
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('icon_chip_bolt')));
+      await tester.tap(find.byKey(const Key('icon_chip_bolt')));
+      await tester.pump();
+
+      // Increment X offset
+      await tester.ensureVisible(find.byKey(const Key('offset_x_inc')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('offset_x_inc')));
+      await tester.pump();
+
+      // Add a new page and switch back to Page 0
+      await tester.tap(find.byKey(const Key('add_page_btn')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('page_chip_0')));
+      await tester.pumpAndSettle();
+
+      // Flush debounced auto-save inside real async context and tear down Launch 1
+      await tester.runAsync(() async {
+        await profileRepo1.saveConfigNow();
+      });
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      viewModel1.dispose();
+      haRepo1.dispose();
+      deviceRepo1.dispose();
+      await tester.pump();
+
+      // --- Launch 2: Relaunch with fresh repositories sharing the same storage ---
+      final profileRepo2 = ProfileRepository(storageService: storageService);
+      final deviceRepo2 = DeviceRepository(useBackgroundJpegIsolate: false);
+      final haRepo2 = HomeAssistantRepository();
+      final executor2 = ActionExecutorUseCase(
+        deviceRepository: deviceRepo2,
+        homeAssistantRepository: haRepo2,
+        hostLauncherService: HostLauncherService(dryRun: true),
+      );
+      final viewModel2 = StudioViewModel(
+        profileRepository: profileRepo2,
+        deviceRepository: deviceRepo2,
+        homeAssistantRepository: haRepo2,
+        actionExecutor: executor2,
+      );
+
+      await tester.runAsync(() async {
+        await viewModel2.initialize(
+          autoConnectSimulator: true,
+          envFilePath: '/non/existent/.env',
+        );
+      });
+
+      await tester.pumpWidget(
+        WavectlHostApp(
+          viewModel: viewModel2,
+          autoConnectSimulator: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(viewModel2.activePage.keys[0].label, equals('Saved Macro Key'));
+      expect(viewModel2.activePage.keys[0].iconName, equals('bolt'));
+      expect(viewModel2.activeProfile.offsetX, equals(1));
+      expect(viewModel2.activeProfile.pages.length, equals(3));
+      expect(find.byKey(const Key('page_chip_2')), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      viewModel2.dispose();
+      haRepo2.dispose();
+      deviceRepo2.dispose();
       await tester.pump();
     },
   );

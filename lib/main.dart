@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data/repositories/device_repository.dart';
 import 'data/repositories/home_assistant_repository.dart';
 import 'data/repositories/profile_repository.dart';
+import 'data/services/config_storage_service.dart';
 import 'data/services/host_launcher_service.dart';
 import 'domain/use_cases/action_executor_use_case.dart';
 import 'ui/core/theme/app_theme.dart';
@@ -16,11 +17,13 @@ void main() {
 
 class WavectlHostApp extends StatefulWidget {
   final StudioViewModel? viewModel;
+  final ConfigStorageService? configStorageService;
   final bool autoConnectSimulator;
 
   const WavectlHostApp({
     super.key,
     this.viewModel,
+    this.configStorageService,
     this.autoConnectSimulator = true,
   });
 
@@ -40,7 +43,10 @@ class _WavectlHostAppState extends State<WavectlHostApp> {
   void initState() {
     super.initState();
     if (widget.viewModel == null) {
-      _ownedProfileRepo = ProfileRepository();
+      _ownedProfileRepo = ProfileRepository(
+        storageService:
+            widget.configStorageService ?? const ConfigStorageService(),
+      );
       _ownedDeviceRepo = DeviceRepository();
       _ownedHaRepo = HomeAssistantRepository();
       final launcherService = HostLauncherService();
@@ -64,6 +70,7 @@ class _WavectlHostAppState extends State<WavectlHostApp> {
   @override
   void dispose() {
     _ownedViewModel?.dispose();
+    _ownedProfileRepo?.dispose();
     _ownedHaRepo?.dispose();
     _ownedDeviceRepo?.dispose();
     super.dispose();
