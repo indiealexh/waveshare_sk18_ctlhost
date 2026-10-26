@@ -96,6 +96,7 @@ class Sk18Profile {
   final String id;
   final String name;
   final bool landscapeMode;
+  final bool upsideDown;
   final int backlight; // 0..100
   final int volume; // 0..7
   final int offsetX; // -64..64
@@ -106,6 +107,7 @@ class Sk18Profile {
     required this.id,
     required this.name,
     this.landscapeMode = true,
+    this.upsideDown = false,
     this.backlight = 85,
     this.volume = 5,
     this.offsetX = 0,
@@ -117,6 +119,7 @@ class Sk18Profile {
     String? id,
     String? name,
     bool? landscapeMode,
+    bool? upsideDown,
     int? backlight,
     int? volume,
     int? offsetX,
@@ -127,6 +130,7 @@ class Sk18Profile {
       id: id ?? this.id,
       name: name ?? this.name,
       landscapeMode: landscapeMode ?? this.landscapeMode,
+      upsideDown: upsideDown ?? this.upsideDown,
       backlight: (backlight ?? this.backlight).clamp(0, 100),
       volume: (volume ?? this.volume).clamp(0, 7),
       offsetX: Sk18Geometry.clampOffset(offsetX ?? this.offsetX),
@@ -159,6 +163,7 @@ class Sk18Profile {
         'backlight': backlight.clamp(0, 100),
         'volume': volume.clamp(0, 7),
         'landscapeMode': landscapeMode,
+        'upsideDown': upsideDown,
         'offsetX': Sk18Geometry.clampOffset(offsetX),
         'offsetY': Sk18Geometry.clampOffset(offsetY),
       },
@@ -178,6 +183,10 @@ class Sk18Profile {
         (json['landscapeMode'] as bool?) ??
         (deviceMap['landscapeMode'] as bool?) ??
         true;
+    final upsideDown =
+        (json['upsideDown'] as bool?) ??
+        (deviceMap['upsideDown'] as bool?) ??
+        false;
     final backlight =
         (json['backlight'] as num? ?? deviceMap['backlight'] as num?)?.toInt() ??
         85;
@@ -226,6 +235,7 @@ class Sk18Profile {
           (json['name'] as String? ?? json['profileName'] as String?) ??
           'Default Studio',
       landscapeMode: landscape,
+      upsideDown: upsideDown,
       backlight: backlight.clamp(0, 100),
       volume: volume.clamp(0, 7),
       offsetX: Sk18Geometry.clampOffset(offsetX),

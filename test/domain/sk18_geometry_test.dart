@@ -121,6 +121,51 @@ void main() {
       expect(simulatedClick.index, equals(10));
     });
 
+    test('remaps physical events with 180-degree inversion when upsideDown is true', () {
+      // When the physical SK18 is placed upside down on the desk, the physical switch
+      // at the user's top-left is portrait col=0, row=5 (unflipped K18), which remaps to K1 (index 0).
+      final invertedTopLeft = Sk18Geometry.remapKeyEvent(
+        col: 0,
+        row: 5,
+        fromPhysicalDevice: true,
+        deviceIsPortrait: true,
+        authoringInLandscape: true,
+        deviceRectCols: 3,
+        upsideDown: true,
+      );
+      expect(invertedTopLeft.col, equals(0));
+      expect(invertedTopLeft.row, equals(0));
+      expect(invertedTopLeft.index, equals(0));
+
+      // Portrait col=2, row=0 (unflipped K1) remaps to K18 (col=5, row=2, index=17) when upside down.
+      final invertedBottomRight = Sk18Geometry.remapKeyEvent(
+        col: 2,
+        row: 0,
+        fromPhysicalDevice: true,
+        deviceIsPortrait: true,
+        authoringInLandscape: true,
+        deviceRectCols: 3,
+        upsideDown: true,
+      );
+      expect(invertedBottomRight.col, equals(5));
+      expect(invertedBottomRight.row, equals(2));
+      expect(invertedBottomRight.index, equals(17));
+
+      // Simulated desktop preview click is never inverted even when upsideDown is true.
+      final simulatedWithUpsideDown = Sk18Geometry.remapKeyEvent(
+        col: 1,
+        row: 0,
+        fromPhysicalDevice: false,
+        deviceIsPortrait: true,
+        authoringInLandscape: true,
+        deviceRectCols: 3,
+        upsideDown: true,
+      );
+      expect(simulatedWithUpsideDown.col, equals(1));
+      expect(simulatedWithUpsideDown.row, equals(0));
+      expect(simulatedWithUpsideDown.index, equals(1));
+    });
+
     test('hitTestKey identifies key index or returns null in gutters/margins', () {
       expect(
         Sk18Geometry.hitTestKey(px: 100, py: 100, isPortrait: false),

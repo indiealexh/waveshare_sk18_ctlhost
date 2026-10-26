@@ -298,6 +298,7 @@ class LeftSidebarPanel extends StatelessWidget {
     int volume,
   ) {
     final isLandscape = viewModel.activeProfile.landscapeMode;
+    final isUpsideDown = viewModel.activeProfile.upsideDown;
 
     return Card(
       child: Padding(
@@ -339,6 +340,22 @@ class LeftSidebarPanel extends StatelessWidget {
                   key: const Key('orientation_switch'),
                   value: isLandscape,
                   onChanged: viewModel.setLandscapeMode,
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Upside Down (180°)',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+                Switch(
+                  key: const Key('upside_down_switch'),
+                  value: isUpsideDown,
+                  onChanged: viewModel.setUpsideDown,
                 ),
               ],
             ),

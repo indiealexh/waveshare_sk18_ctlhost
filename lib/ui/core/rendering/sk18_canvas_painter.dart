@@ -70,6 +70,7 @@ class Sk18CanvasRenderer {
     Size size, {
     required Sk18Page page,
     required bool isPortrait,
+    bool upsideDown = false,
     Map<String, HaEntityState> haEntities = const {},
     Set<int> pressedKeyIndices = const {},
     int? selectedKeyIndex,
@@ -94,6 +95,11 @@ class Sk18CanvasRenderer {
     canvas.drawRect(fullRect, bgPaint);
 
     // 2. Top & bottom non-key margin status bands (63 px height in landscape)
+    if (upsideDown) {
+      canvas.save();
+      canvas.translate(size.width, size.height);
+      canvas.rotate(math.pi);
+    }
     _paintMarginTelemetryBands(
       canvas,
       size,
@@ -105,6 +111,9 @@ class Sk18CanvasRenderer {
       offsetX: offsetX,
       offsetY: offsetY,
     );
+    if (upsideDown) {
+      canvas.restore();
+    }
 
     // 3. Compute exact 18 key rectangles (with +12 px firmware margin fix + user offsets)
     final keyRects = Sk18Geometry.computeKeyRects(
@@ -114,8 +123,10 @@ class Sk18CanvasRenderer {
       offsetY: offsetY,
     );
 
-    for (int i = 0; i < keyRects.length && i < page.keys.length; i++) {
-      final rectModel = keyRects[i];
+    final count = math.min(keyRects.length, page.keys.length);
+    for (int i = 0; i < count; i++) {
+      final rectIndex = upsideDown ? (count - 1 - i) : i;
+      final rectModel = keyRects[rectIndex];
       final keyConfig = page.keys[i];
       final isPressed = pressedKeyIndices.contains(i);
       final isSelected = showDesktopSelectionOutline && selectedKeyIndex == i;
@@ -130,6 +141,7 @@ class Sk18CanvasRenderer {
         haState: haState,
         isPressed: isPressed,
         isSelected: isSelected,
+        upsideDown: upsideDown,
       );
     }
   }
@@ -187,6 +199,7 @@ class Sk18CanvasRenderer {
     required HaEntityState? haState,
     required bool isPressed,
     required bool isSelected,
+    bool upsideDown = false,
   }) {
     final baseRect = Rect.fromLTWH(
       rectModel.x.toDouble(),
@@ -194,6 +207,13 @@ class Sk18CanvasRenderer {
       rectModel.width.toDouble(),
       rectModel.height.toDouble(),
     );
+
+    if (upsideDown) {
+      canvas.save();
+      canvas.translate(baseRect.center.dx, baseRect.center.dy);
+      canvas.rotate(math.pi);
+      canvas.translate(-baseRect.center.dx, -baseRect.center.dy);
+    }
 
     final rrect = RRect.fromRectAndRadius(
       isPressed ? baseRect.deflate(3.0) : baseRect,
@@ -323,6 +343,10 @@ class Sk18CanvasRenderer {
         fontWeight: FontWeight.w700,
       ),
     );
+
+    if (upsideDown) {
+      canvas.restore();
+    }
   }
 
   static String _resolveTopRightPill(
@@ -425,6 +449,7 @@ class Sk18CanvasRenderer {
     required Sk18Page page,
     required bool authoringInLandscape,
     required bool rotateForPortraitDevice,
+    bool upsideDown = false,
     Map<String, HaEntityState> haEntities = const {},
     Set<int> pressedKeyIndices = const {},
     List<Sk18KeyRect>? rawDeviceRects,
@@ -453,6 +478,7 @@ class Sk18CanvasRenderer {
         const Size(1280, 720),
         page: page,
         isPortrait: false,
+        upsideDown: upsideDown,
         haEntities: haEntities,
         pressedKeyIndices: pressedKeyIndices,
         rawDeviceRects: null,
@@ -500,6 +526,7 @@ class Sk18CanvasRenderer {
       Size(targetWidth.toDouble(), targetHeight.toDouble()),
       page: page,
       isPortrait: isPortraitCanvas,
+      upsideDown: upsideDown,
       haEntities: haEntities,
       pressedKeyIndices: pressedKeyIndices,
       rawDeviceRects: matchingDeviceRects,
@@ -529,6 +556,7 @@ class Sk18CanvasRenderer {
 class Sk18CanvasPainter extends CustomPainter {
   final Sk18Page page;
   final bool isPortrait;
+  final bool upsideDown;
   final Map<String, HaEntityState> haEntities;
   final Set<int> pressedKeyIndices;
   final int? selectedKeyIndex;
@@ -542,6 +570,7 @@ class Sk18CanvasPainter extends CustomPainter {
   const Sk18CanvasPainter({
     required this.page,
     required this.isPortrait,
+    this.upsideDown = false,
     this.haEntities = const {},
     this.pressedKeyIndices = const {},
     this.selectedKeyIndex,
@@ -569,6 +598,7 @@ class Sk18CanvasPainter extends CustomPainter {
       Size(logicalWidth, logicalHeight),
       page: page,
       isPortrait: isPortrait,
+      upsideDown: upsideDown,
       haEntities: haEntities,
       pressedKeyIndices: pressedKeyIndices,
       selectedKeyIndex: selectedKeyIndex,
@@ -587,6 +617,7 @@ class Sk18CanvasPainter extends CustomPainter {
   bool shouldRepaint(covariant Sk18CanvasPainter oldDelegate) {
     return oldDelegate.page != page ||
         oldDelegate.isPortrait != isPortrait ||
+        oldDelegate.upsideDown != upsideDown ||
         oldDelegate.haEntities != haEntities ||
         oldDelegate.pressedKeyIndices != pressedKeyIndices ||
         oldDelegate.selectedKeyIndex != selectedKeyIndex ||

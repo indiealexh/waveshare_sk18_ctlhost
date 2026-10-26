@@ -117,6 +117,31 @@ void main() {
       );
       await tester.pump();
 
+      // 4b. Toggle Upside Down orientation and verify physical key press at (col=0, row=5) triggers K1 (index=0)
+      await tester.ensureVisible(find.byKey(const Key('upside_down_switch')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('upside_down_switch')));
+      await tester.pump();
+      expect(viewModel.activeProfile.upsideDown, isTrue);
+
+      deviceRepo.simulatorTransport.emitPhysicalKeyStateChanged(
+        col: 0,
+        row: 5,
+        pressed: true,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(haRepo.entities['light.office_main']?.state, equals('off'));
+      deviceRepo.simulatorTransport.emitPhysicalKeyStateChanged(
+        col: 0,
+        row: 5,
+        pressed: false,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('upside_down_switch')));
+      await tester.pump();
+      expect(viewModel.activeProfile.upsideDown, isFalse);
+
       // 5. Add a new page in Left Sidebar and switch back
       await tester.tap(find.byKey(const Key('add_page_btn')));
       await tester.pumpAndSettle();

@@ -6,7 +6,7 @@ import 'package:wavectl_host/domain/models/sk18_profile.dart';
 void main() {
   group('Sk18Profile & ButtonAction Serialization', () {
     test('round-trips default multi-page profile across all four action categories', () {
-      final original = Sk18Profile.createDefault();
+      final original = Sk18Profile.createDefault().copyWith(upsideDown: true);
       expect(original.pages.length, equals(2));
       expect(original.pages.first.keys.length, equals(18));
 
@@ -16,6 +16,7 @@ void main() {
 
       expect(restored.id, equals(original.id));
       expect(restored.name, equals(original.name));
+      expect(restored.upsideDown, isTrue);
       expect(restored.backlight, equals(85));
       expect(restored.volume, equals(5));
       expect(restored.pages.length, equals(2));

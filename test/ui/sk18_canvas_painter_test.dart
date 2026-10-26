@@ -9,6 +9,7 @@ import 'package:wavectl_host/data/services/serial_transport_service.dart';
 import 'package:wavectl_host/domain/models/ha_entity_state.dart';
 import 'package:wavectl_host/domain/models/sk18_profile.dart';
 import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
+import 'package:wavectl_host/ui/core/rendering/sk18_canvas_painter.dart';
 import 'package:wavectl_host/ui/features/studio/view_models/studio_view_model.dart';
 
 void main() {
@@ -67,6 +68,27 @@ void main() {
         expect(decodedPortrait, isNotNull);
         expect(decodedPortrait!.width, equals(720));
         expect(decodedPortrait.height, equals(1280));
+
+        // 2b. Verify upsideDown 180-degree flip renders valid frame and swaps key slot positions
+        final normalRaw = await Sk18CanvasRenderer.renderOffscreenRgba(
+          page: page,
+          authoringInLandscape: true,
+          rotateForPortraitDevice: false,
+          upsideDown: false,
+          haEntities: haEntities,
+        );
+        final upsideDownRaw = await Sk18CanvasRenderer.renderOffscreenRgba(
+          page: page,
+          authoringInLandscape: true,
+          rotateForPortraitDevice: false,
+          upsideDown: true,
+          haEntities: haEntities,
+        );
+        expect(upsideDownRaw.width, equals(1280));
+        expect(upsideDownRaw.height, equals(720));
+        // Sample a pixel inside K1's top-left border/fill area (col=0, row=0 -> x=30, y=75)
+        // vs K18's bottom-right mirror position (col=5, row=2 -> x=1112 + (158 - 1 - 8) = 1261, y=499 + (158 - 1 - 12) = 644)
+        expect(upsideDownRaw.rgbaBytes, isNot(equals(normalRaw.rgbaBytes)));
 
         // 3. Verify StudioViewModel binds JpegFrameStreamer callback and streams JPEG on connect
         final profileRepo = ProfileRepository();

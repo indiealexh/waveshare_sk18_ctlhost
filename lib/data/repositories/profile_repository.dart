@@ -44,6 +44,7 @@ class ProfileRepository {
       id: 'profile_${DateTime.now().millisecondsSinceEpoch}',
       name: name.trim().isEmpty ? 'Profile ${_profiles.length + 1}' : name.trim(),
       landscapeMode: activeProfile.landscapeMode,
+      upsideDown: activeProfile.upsideDown,
       backlight: activeProfile.backlight,
       volume: activeProfile.volume,
       offsetX: activeProfile.offsetX,

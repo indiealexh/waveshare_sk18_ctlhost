@@ -128,6 +128,10 @@ class Sk18Geometry {
   ///   `logicalCol = physRow` (`0..5`)
   ///   `logicalRow = (deviceRectCols - 1) - physCol` (`2 - physCol`, `0..2`)
   ///
+  /// When `upsideDown = true`, physical device coordinates are additionally inverted
+  /// 180° (`col = cols - 1 - col`, `row = rows - 1 - row`) so `K1` stays at the
+  /// top-left of a physically inverted device.
+  ///
   /// Simulated button clicks from the desktop UI preview (`fromPhysicalDevice: false`)
   /// are NEVER remapped.
   static Sk18KeyCoord remapKeyEvent({
@@ -137,20 +141,29 @@ class Sk18Geometry {
     bool deviceIsPortrait = true,
     bool authoringInLandscape = true,
     int deviceRectCols = portraitCols,
+    bool upsideDown = false,
   }) {
-    if (fromPhysicalDevice && deviceIsPortrait && authoringInLandscape) {
-      final logicalCol = row.clamp(0, landscapeCols - 1);
-      final logicalRow = ((deviceRectCols - 1) - col).clamp(0, landscapeRows - 1);
-      final index = logicalRow * landscapeCols + logicalCol;
-      return Sk18KeyCoord(index: index, col: logicalCol, row: logicalRow);
-    }
-
     final cols = authoringInLandscape ? landscapeCols : portraitCols;
     final rows = authoringInLandscape ? landscapeRows : portraitRows;
-    final safeCol = col.clamp(0, cols - 1);
-    final safeRow = row.clamp(0, rows - 1);
-    final index = safeRow * cols + safeCol;
-    return Sk18KeyCoord(index: index, col: safeCol, row: safeRow);
+
+    int logicalCol;
+    int logicalRow;
+
+    if (fromPhysicalDevice && deviceIsPortrait && authoringInLandscape) {
+      logicalCol = row.clamp(0, landscapeCols - 1);
+      logicalRow = ((deviceRectCols - 1) - col).clamp(0, landscapeRows - 1);
+    } else {
+      logicalCol = col.clamp(0, cols - 1);
+      logicalRow = row.clamp(0, rows - 1);
+    }
+
+    if (fromPhysicalDevice && upsideDown) {
+      logicalCol = (cols - 1) - logicalCol;
+      logicalRow = (rows - 1) - logicalRow;
+    }
+
+    final index = logicalRow * cols + logicalCol;
+    return Sk18KeyCoord(index: index, col: logicalCol, row: logicalRow);
   }
 
   /// Hit-tests a logical canvas point `(px, py)` against the 18 key rectangles.

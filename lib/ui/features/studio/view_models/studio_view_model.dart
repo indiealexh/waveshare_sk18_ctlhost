@@ -117,6 +117,7 @@ class StudioViewModel extends ChangeNotifier {
       page: page,
       authoringInLandscape: profile.landscapeMode,
       rotateForPortraitDevice: devInfo.isPortrait,
+      upsideDown: profile.upsideDown,
       haEntities: haEntities,
       pressedKeyIndices: pressedKeyIndices,
       rawDeviceRects: devInfo.rects,
@@ -264,6 +265,17 @@ class StudioViewModel extends ChangeNotifier {
       landscape
           ? 'Orientation: Landscape (1280x720, 6x3)'
           : 'Orientation: Portrait (720x1280, 3x6)',
+    );
+    _safeNotifyListeners();
+  }
+
+  Future<void> setUpsideDown(bool upsideDown) async {
+    final updated = activeProfile.copyWith(upsideDown: upsideDown);
+    _profileRepository.updateActiveProfile(updated);
+    _setStatus(
+      upsideDown
+          ? 'Device Display: Upside Down (180°)'
+          : 'Device Display: Normal (0°)',
     );
     _safeNotifyListeners();
   }
@@ -476,6 +488,7 @@ class StudioViewModel extends ChangeNotifier {
           deviceIsPortrait: _deviceRepository.deviceInfo.isPortrait,
           authoringInLandscape: activeProfile.landscapeMode,
           deviceRectCols: _deviceRepository.deviceInfo.rectCols,
+          upsideDown: activeProfile.upsideDown,
         );
 
         if (pressed) {

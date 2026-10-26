@@ -165,7 +165,7 @@ class CenterCanvasPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'SK18 Live LCD Preview (${viewModel.activeProfile.landscapeMode ? '1280×720' : '720×1280'})',
+                    'SK18 Live LCD Preview (${viewModel.activeProfile.landscapeMode ? '1280×720' : '720×1280'}${viewModel.activeProfile.upsideDown ? ' • Device Upside Down' : ''})',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
@@ -180,6 +180,15 @@ class CenterCanvasPanel extends StatelessWidget {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                FilterChip(
+                  key: const Key('upside_down_chip'),
+                  label: const Text(
+                    'Upside Down',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  selected: viewModel.activeProfile.upsideDown,
+                  onSelected: viewModel.setUpsideDown,
+                ),
                 FilterChip(
                   key: const Key('test_mode_switch'),
                   label: const Text(
