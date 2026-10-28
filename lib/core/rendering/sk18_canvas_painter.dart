@@ -203,18 +203,21 @@ class Sk18CanvasRenderer {
     final regionRect = (isPortrait
             ? spec.statusRegionRectPortrait
             : spec.statusRegionRectLandscape)!;
+    final regionInset = (spec.borderWidth / 2.0).ceilToDouble();
+    final cornerRadius = spec.statusRegionCornerRadius ?? spec.cornerRadius;
 
     canvas.save();
+    canvas.clipRect(regionRect);
     if (upsideDown) {
       canvas.translate(regionRect.center.dx, regionRect.center.dy);
       canvas.rotate(math.pi);
       canvas.translate(-regionRect.center.dx, -regionRect.center.dy);
     }
 
-    final cardRect = regionRect.deflate(8);
+    final cardRect = regionRect.deflate(regionInset);
     final cardRRect = RRect.fromRectAndRadius(
       cardRect,
-      const Radius.circular(16),
+      Radius.circular(cornerRadius),
     );
 
     final cardFill = Paint()
@@ -225,11 +228,19 @@ class Sk18CanvasRenderer {
       );
     canvas.drawRRect(cardRRect, cardFill);
 
+    const strokeWidth = Sk18Geometry.borderWidth;
+    const halfStroke = strokeWidth / 2.0;
+    final borderRRect = RRect.fromRectAndRadius(
+      cardRect.deflate(halfStroke),
+      Radius.circular(math.max(0.0, cornerRadius - halfStroke)),
+    );
     final cardBorder = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = strokeWidth
       ..color = const Color(0xFF38BDF8).withValues(alpha: 0.35);
-    canvas.drawRRect(cardRRect, cardBorder);
+    canvas.drawRRect(borderRRect, cardBorder);
+
+    canvas.clipRRect(borderRRect);
 
     final calLabel =
         'CAL (${offsetX >= 0 ? '+$offsetX' : '$offsetX'}, ${offsetY >= 0 ? '+$offsetY' : '$offsetY'})';
@@ -237,8 +248,8 @@ class Sk18CanvasRenderer {
 
     // Row 1: model badge (left) + digital clock (right)
     final badgeRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(cardRect.left + 10, cardRect.top + 10, 104, 24),
-      const Radius.circular(8),
+      Rect.fromLTWH(cardRect.left + 16, cardRect.top + 14, 102, 24),
+      const Radius.circular(10),
     );
     canvas.drawRRect(
       badgeRect,
@@ -247,8 +258,8 @@ class Sk18CanvasRenderer {
     _drawText(
       canvas,
       text: 'MK10 • 10-KEY',
-      offset: Offset(cardRect.left + 10, cardRect.top + 16),
-      maxWidth: 104,
+      offset: Offset(cardRect.left + 16, cardRect.top + 20),
+      maxWidth: 102,
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: Color(0xFF38BDF8),
@@ -260,8 +271,8 @@ class Sk18CanvasRenderer {
     _drawText(
       canvas,
       text: clockString,
-      offset: Offset(cardRect.right - 110, cardRect.top + 10),
-      maxWidth: 100,
+      offset: Offset(cardRect.right - 114, cardRect.top + 14),
+      maxWidth: 96,
       textAlign: TextAlign.right,
       style: const TextStyle(
         color: Color(0xFFF8FAFC),
@@ -274,8 +285,8 @@ class Sk18CanvasRenderer {
     _drawText(
       canvas,
       text: profileName,
-      offset: Offset(cardRect.left + 10, cardRect.top + 42),
-      maxWidth: cardRect.width - 20,
+      offset: Offset(cardRect.left + 14, cardRect.top + 46),
+      maxWidth: cardRect.width - 28,
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: Color(0xFFE2E8F0),
@@ -288,8 +299,8 @@ class Sk18CanvasRenderer {
     _drawText(
       canvas,
       text: '$pageName  •  $statusText',
-      offset: Offset(cardRect.left + 10, cardRect.top + 62),
-      maxWidth: cardRect.width - 20,
+      offset: Offset(cardRect.left + 14, cardRect.top + 66),
+      maxWidth: cardRect.width - 28,
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: Color(0xFF34D399),
@@ -302,8 +313,8 @@ class Sk18CanvasRenderer {
     _drawText(
       canvas,
       text: '896×304 IPS  •  $calLabel',
-      offset: Offset(cardRect.left + 10, cardRect.top + 80),
-      maxWidth: cardRect.width - 20,
+      offset: Offset(cardRect.left + 14, cardRect.top + 84),
+      maxWidth: cardRect.width - 28,
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: Color(0xFF94A3B8),
@@ -315,12 +326,12 @@ class Sk18CanvasRenderer {
     // Live Home Assistant entity sub-cards, stacked and clipped to the card
     for (int i = 0; i < entityList.length; i++) {
       final itemRect = Rect.fromLTWH(
-        cardRect.left + 10,
-        cardRect.top + 100 + i * 70.0,
-        cardRect.width - 20,
+        cardRect.left + 12,
+        cardRect.top + 104 + i * 70.0,
+        cardRect.width - 24,
         62,
       );
-      if (itemRect.bottom > cardRect.bottom - 8) break;
+      if (itemRect.bottom > cardRect.bottom - 14) break;
       _paintMk10EntitySubCard(canvas, itemRect, entityList[i]);
     }
 

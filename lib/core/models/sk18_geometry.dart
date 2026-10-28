@@ -70,6 +70,7 @@ class DeviceModelSpec {
   final double borderWidth;
   final Rect? statusRegionRectLandscape;
   final Rect? statusRegionRectPortrait;
+  final double? statusRegionCornerRadius;
 
   const DeviceModelSpec({
     required this.model,
@@ -96,6 +97,7 @@ class DeviceModelSpec {
     required this.borderWidth,
     this.statusRegionRectLandscape,
     this.statusRegionRectPortrait,
+    this.statusRegionCornerRadius,
   });
 
   int get pitchX => keyWidth + gapX;
@@ -161,6 +163,7 @@ class DeviceModelSpec {
     borderWidth: 5,
     statusRegionRectLandscape: Rect.fromLTWH(656, 0, 240, 296),
     statusRegionRectPortrait: Rect.fromLTWH(0, 0, 296, 240),
+    statusRegionCornerRadius: 40,
   );
 }
 

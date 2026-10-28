@@ -147,6 +147,29 @@ void main() {
         final outerBgPixel = pixelRgb(mk10LandscapeRaw, 648, 150);
         final headerCardPixel = pixelRgb(mk10LandscapeRaw, 700, 30);
         expect(headerCardPixel, isNot(equals(outerBgPixel)));
+        expect(DeviceModelSpec.mk10.statusRegionCornerRadius, equals(40));
+
+        // Verify the MK10 side screen uses the 40 px corner radius (so points
+        // 9 px inside cardRect's bounding box corners are outside the 40 px arc
+        // and stay background, whereas points inside the 40 px arc are painted).
+        for (final cornerOutside in const [
+          (668, 12),
+          (884, 12),
+          (668, 284),
+          (884, 284),
+        ]) {
+          final rgb = pixelRgb(
+            mk10LandscapeRaw,
+            cornerOutside.$1,
+            cornerOutside.$2,
+          );
+          final rChannel = (rgb >> 16) & 0xFF;
+          // Outside the 40 px arc remains the dark LCD background (R <= 0x12),
+          // not the lighter slate/cyan card fill/border (R >= 0x18).
+          expect(rChannel, lessThanOrEqualTo(0x12));
+        }
+        final insideArcRgb = pixelRgb(mk10LandscapeRaw, 675, 19);
+        expect((insideArcRgb >> 16) & 0xFF, greaterThanOrEqualTo(0x18));
 
         // Verify MK10 tiles are inset and clipped to their 128x128 cell so no
         // 1-2 px border or selection ring bleeds into adjacent tiles on any side.
