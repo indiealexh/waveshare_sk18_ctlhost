@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wavectl_host/data/services/protocol_v2_codec.dart';
+import 'package:wavectl_host/core/protocol/protocol_v2_codec.dart';
 
 void main() {
   group('ProtocolV2Codec & StreamDecoder', () {

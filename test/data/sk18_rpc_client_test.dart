@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wavectl_host/data/repositories/device_repository.dart';
-import 'package:wavectl_host/data/services/jpeg_frame_streamer.dart';
-import 'package:wavectl_host/data/services/protocol_v2_codec.dart';
-import 'package:wavectl_host/data/services/serial_transport_service.dart';
-import 'package:wavectl_host/data/services/sk18_rpc_client.dart';
-import 'package:wavectl_host/domain/models/sk18_geometry.dart';
-import 'package:wavectl_host/domain/models/sk18_profile.dart';
+import 'package:wavectl_host/features/device/data/device_repository.dart';
+import 'package:wavectl_host/features/device/data/jpeg_frame_streamer.dart';
+import 'package:wavectl_host/core/protocol/protocol_v2_codec.dart';
+import 'package:wavectl_host/core/protocol/serial_transport_service.dart';
+import 'package:wavectl_host/core/protocol/sk18_rpc_client.dart';
+import 'package:wavectl_host/core/models/sk18_geometry.dart';
+import 'package:wavectl_host/features/profiles/domain/sk18_profile.dart';
 
 class _SilentHardwareTransport implements Sk18Transport {
   final StreamController<Uint8List> _controller =

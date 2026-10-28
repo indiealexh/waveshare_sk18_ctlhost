@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wavectl_host/domain/models/sk18_device_info.dart';
-import 'package:wavectl_host/domain/models/sk18_geometry.dart';
+import 'package:wavectl_host/core/models/sk18_device_info.dart';
+import 'package:wavectl_host/core/models/sk18_geometry.dart';
 
 void main() {
   group('Sk18Geometry', () {

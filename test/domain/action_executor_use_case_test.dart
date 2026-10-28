@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wavectl_host/data/repositories/device_repository.dart';
-import 'package:wavectl_host/data/repositories/home_assistant_repository.dart';
-import 'package:wavectl_host/data/services/host_launcher_service.dart';
-import 'package:wavectl_host/data/services/serial_transport_service.dart';
-import 'package:wavectl_host/domain/models/button_action.dart';
-import 'package:wavectl_host/domain/models/sk18_profile.dart';
-import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
+import 'package:wavectl_host/features/device/data/device_repository.dart';
+import 'package:wavectl_host/features/home_assistant/data/home_assistant_repository.dart';
+import 'package:wavectl_host/features/actions/data/host_launcher_service.dart';
+import 'package:wavectl_host/core/protocol/serial_transport_service.dart';
+import 'package:wavectl_host/features/actions/domain/button_action.dart';
+import 'package:wavectl_host/features/profiles/domain/sk18_profile.dart';
+import 'package:wavectl_host/features/actions/domain/action_executor_use_case.dart';
 
 void main() {
   group('ActionExecutorUseCase Hybrid Router', () {

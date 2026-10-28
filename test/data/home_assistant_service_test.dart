@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:wavectl_host/data/services/env_config_loader.dart';
-import 'package:wavectl_host/data/services/home_assistant_service.dart';
-import 'package:wavectl_host/domain/models/button_action.dart';
-import 'package:wavectl_host/domain/models/ha_entity_state.dart';
+import 'package:wavectl_host/features/home_assistant/data/env_config_loader.dart';
+import 'package:wavectl_host/features/home_assistant/data/home_assistant_service.dart';
+import 'package:wavectl_host/features/actions/domain/button_action.dart';
+import 'package:wavectl_host/features/home_assistant/domain/ha_entity_state.dart';
 
 void main() {
   group('EnvConfigLoader & HomeAssistantService', () {

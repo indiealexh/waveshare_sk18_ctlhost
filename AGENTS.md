@@ -34,6 +34,7 @@ Keep context lean: follow these rules directly and only read specific files in `
 
 Read only the file needed for your current task:
 
+- `docs/architecture.md` — Feature-first module map, registry extension recipes, and zero-behavior-change contracts.
 - `docs/pocflutter-lessons-and-production-guide.md` — **Must-read** for serial I/O, rendering, GPU rotation, JPEG encoding, and Flutter testing pitfalls.
 - `docs/hardware-and-geometry.md` — Dual-SoC hardware architecture and exact 18-key pixel coordinates/margins in landscape and portrait.
 - `docs/protocol-v2.md` — Stock Protocol V2 binary packet framing (`0xA1A55A5E`), CRC32, JPEG streaming (`cmd = 100`), and all 10 stock JSON-RPC methods (`cmd = 101`).

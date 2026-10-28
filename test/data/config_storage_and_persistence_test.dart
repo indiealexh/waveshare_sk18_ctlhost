@@ -3,16 +3,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:wavectl_host/data/repositories/device_repository.dart';
-import 'package:wavectl_host/data/repositories/home_assistant_repository.dart';
-import 'package:wavectl_host/data/repositories/profile_repository.dart';
-import 'package:wavectl_host/data/services/config_storage_service.dart';
-import 'package:wavectl_host/data/services/host_launcher_service.dart';
-import 'package:wavectl_host/data/services/serial_transport_service.dart';
-import 'package:wavectl_host/domain/models/button_action.dart';
-import 'package:wavectl_host/domain/models/sk18_geometry.dart';
-import 'package:wavectl_host/domain/use_cases/action_executor_use_case.dart';
-import 'package:wavectl_host/ui/features/studio/view_models/studio_view_model.dart';
+import 'package:wavectl_host/features/device/data/device_repository.dart';
+import 'package:wavectl_host/features/home_assistant/data/home_assistant_repository.dart';
+import 'package:wavectl_host/features/profiles/data/profile_repository.dart';
+import 'package:wavectl_host/features/profiles/data/config_storage_service.dart';
+import 'package:wavectl_host/features/actions/data/host_launcher_service.dart';
+import 'package:wavectl_host/core/protocol/serial_transport_service.dart';
+import 'package:wavectl_host/features/actions/domain/button_action.dart';
+import 'package:wavectl_host/core/models/sk18_geometry.dart';
+import 'package:wavectl_host/features/actions/domain/action_executor_use_case.dart';
+import 'package:wavectl_host/features/studio/presentation/studio_view_model.dart';
 
 class _TestDeviceRepository extends DeviceRepository {
   final List<String> _discoveredPorts;

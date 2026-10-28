@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'data/repositories/device_repository.dart';
-import 'data/repositories/home_assistant_repository.dart';
-import 'data/repositories/profile_repository.dart';
-import 'data/services/config_storage_service.dart';
-import 'data/services/host_launcher_service.dart';
-import 'domain/use_cases/action_executor_use_case.dart';
-import 'ui/core/theme/app_theme.dart';
-import 'ui/features/studio/view_models/studio_view_model.dart';
-import 'ui/features/studio/views/studio_screen.dart';
+import 'core/theme/app_theme.dart';
+import 'features/device/data/device_repository.dart';
+import 'features/home_assistant/data/home_assistant_repository.dart';
+import 'features/profiles/data/config_storage_service.dart';
+import 'features/profiles/data/profile_repository.dart';
+import 'features/actions/data/host_launcher_service.dart';
+import 'features/actions/domain/action_executor_use_case.dart';
+import 'features/studio/presentation/studio_view_model.dart';
+import 'features/studio/presentation/studio_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
