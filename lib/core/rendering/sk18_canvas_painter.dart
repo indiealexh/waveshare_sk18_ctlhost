@@ -146,6 +146,15 @@ class Sk18CanvasRenderer {
       model: model,
     );
 
+    final spec = model.spec;
+    final hasZeroGutter = spec.gapX == 0 || spec.gapY == 0;
+    final tileInset = hasZeroGutter
+        ? (spec.borderWidth / 2.0).ceilToDouble()
+        : 0.0;
+    final effectiveBorderWidth = hasZeroGutter
+        ? Sk18Geometry.borderWidth
+        : spec.borderWidth;
+
     final count = math.min(keyRects.length, page.keys.length);
     for (int i = 0; i < count; i++) {
       final rectIndex = upsideDown ? (count - 1 - i) : i;
@@ -165,8 +174,9 @@ class Sk18CanvasRenderer {
         isPressed: isPressed,
         isSelected: isSelected,
         upsideDown: upsideDown,
-        cornerRadius: model.spec.cornerRadius,
-        borderWidth: model.spec.borderWidth,
+        cornerRadius: spec.cornerRadius,
+        borderWidth: effectiveBorderWidth,
+        tileInset: tileInset,
       );
     }
   }
@@ -452,6 +462,7 @@ class Sk18CanvasRenderer {
     bool upsideDown = false,
     double cornerRadius = Sk18Geometry.cornerRadius,
     double borderWidth = Sk18Geometry.borderWidth,
+    double tileInset = 0.0,
   }) {
     final baseRect = Rect.fromLTWH(
       rectModel.x.toDouble(),
@@ -460,15 +471,23 @@ class Sk18CanvasRenderer {
       rectModel.height.toDouble(),
     );
 
+    canvas.save();
+    if (tileInset > 0.0) {
+      canvas.clipRect(baseRect);
+    }
     if (upsideDown) {
-      canvas.save();
       canvas.translate(baseRect.center.dx, baseRect.center.dy);
       canvas.rotate(math.pi);
       canvas.translate(-baseRect.center.dx, -baseRect.center.dy);
     }
 
+    final tileRect = tileInset > 0.0 ? baseRect.deflate(tileInset) : baseRect;
+    final pressDeflate = tileInset > 0.0 ? 2.0 : 3.0;
+    final effectiveTileRect = isPressed
+        ? tileRect.deflate(pressDeflate)
+        : tileRect;
     final rrect = RRect.fromRectAndRadius(
-      isPressed ? baseRect.deflate(3.0) : baseRect,
+      effectiveTileRect,
       Radius.circular(cornerRadius),
     );
 
@@ -480,8 +499,8 @@ class Sk18CanvasRenderer {
     // Keycap background gradient
     final tileFillPaint = Paint()
       ..shader = ui.Gradient.linear(
-        baseRect.topLeft,
-        baseRect.bottomRight,
+        effectiveTileRect.topLeft,
+        effectiveTileRect.bottomRight,
         [
           isPressed
               ? accentColor.withValues(alpha: 0.42)
@@ -491,26 +510,41 @@ class Sk18CanvasRenderer {
       );
     canvas.drawRRect(rrect, tileFillPaint);
 
-    // Active HA or Pressed glow border
+    // Active HA or Pressed glow border (inset by half strokeWidth so the stroke
+    // stays strictly inside effectiveTileRect and never bleeds into neighbors)
+    final strokeWidth = (isPressed || isHaActive)
+        ? (tileInset > 0.0 ? 3.0 : 3.5)
+        : borderWidth;
+    final halfStroke = strokeWidth / 2.0;
+    final borderRRect = RRect.fromRectAndRadius(
+      effectiveTileRect.deflate(halfStroke),
+      Radius.circular(math.max(0.0, cornerRadius - halfStroke)),
+    );
     final borderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isPressed || isHaActive) ? 3.5 : borderWidth
+      ..strokeWidth = strokeWidth
       ..color = isPressed
           ? Colors.white
           : (isHaActive
                 ? accentColor
                 : accentColor.withValues(alpha: 0.55));
-    canvas.drawRRect(rrect, borderPaint);
+    canvas.drawRRect(borderRRect, borderPaint);
 
     // Desktop studio selection ring
     if (isSelected) {
-      final selectRRect = RRect.fromRectAndRadius(
-        baseRect.inflate(4.0),
-        Radius.circular(cornerRadius + 4.0),
-      );
+      final selectStrokeWidth = tileInset > 0.0 ? 2.0 : 2.5;
+      final selectRRect = tileInset > 0.0
+          ? RRect.fromRectAndRadius(
+              baseRect.deflate(selectStrokeWidth / 2.0),
+              Radius.circular(cornerRadius + (tileInset - selectStrokeWidth / 2.0)),
+            )
+          : RRect.fromRectAndRadius(
+              baseRect.inflate(4.0),
+              Radius.circular(cornerRadius + 4.0),
+            );
       final selectPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
+        ..strokeWidth = selectStrokeWidth
         ..color = const Color(0xFF38BDF8);
       canvas.drawRRect(selectRRect, selectPaint);
     }
@@ -603,9 +637,7 @@ class Sk18CanvasRenderer {
       ),
     );
 
-    if (upsideDown) {
-      canvas.restore();
-    }
+    canvas.restore();
   }
 
   static void _drawText(

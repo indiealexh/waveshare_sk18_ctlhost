@@ -148,6 +148,56 @@ void main() {
         final headerCardPixel = pixelRgb(mk10LandscapeRaw, 700, 30);
         expect(headerCardPixel, isNot(equals(outerBgPixel)));
 
+        // Verify MK10 tiles are inset and clipped to their 128x128 cell so no
+        // 1-2 px border or selection ring bleeds into adjacent tiles on any side.
+        final mk10KeyRects = Sk18Geometry.computeKeyRects(
+          isPortrait: false,
+          model: WaveshareModel.mk10,
+        );
+        for (final rect in mk10KeyRects) {
+          final midX = rect.centerX.floor();
+          final midY = rect.centerY.floor();
+          // Outer 2 px on all 4 sides of each 128x128 cell must remain background
+          // (no neighbor border bleed) while the inset border at +3 / -3 is painted.
+          final leftOuter = pixelRgb(mk10LandscapeRaw, rect.x + 1, midY);
+          final rightOuter = pixelRgb(mk10LandscapeRaw, rect.right - 1, midY);
+          final topOuter = pixelRgb(mk10LandscapeRaw, midX, rect.y + 1);
+          final bottomOuter = pixelRgb(mk10LandscapeRaw, midX, rect.bottom - 1);
+
+          final leftBorder = pixelRgb(mk10LandscapeRaw, rect.x + 3, midY);
+          final rightBorder = pixelRgb(mk10LandscapeRaw, rect.right - 3, midY);
+          final topBorder = pixelRgb(mk10LandscapeRaw, midX, rect.y + 3);
+          final bottomBorder = pixelRgb(mk10LandscapeRaw, midX, rect.bottom - 3);
+
+          expect(leftBorder, isNot(equals(leftOuter)));
+          expect(rightBorder, isNot(equals(rightOuter)));
+          expect(topBorder, isNot(equals(topOuter)));
+          expect(bottomBorder, isNot(equals(bottomOuter)));
+        }
+
+        // Pressing K1 (index 0) must not alter a single pixel inside adjacent
+        // tiles K2 (x=128..255, y=0..127) or K6 (x=0..127, y=128..255).
+        final mk10PressedRaw = await Sk18CanvasRenderer.renderOffscreenRgba(
+          page: mk10Page,
+          authoringInLandscape: true,
+          rotateForPortraitDevice: false,
+          model: WaveshareModel.mk10,
+          haEntities: haEntities,
+          pressedKeyIndices: const {0},
+          profileName: mk10Profile.name,
+        );
+        for (final neighborIndex in const [1, 5]) {
+          final neighbor = mk10KeyRects[neighborIndex];
+          for (int y = neighbor.y; y <= neighbor.bottom; y++) {
+            for (int x = neighbor.x; x <= neighbor.right; x++) {
+              expect(
+                pixelRgb(mk10PressedRaw, x, y),
+                equals(pixelRgb(mk10LandscapeRaw, x, y)),
+              );
+            }
+          }
+        }
+
         final mk10RotatedJpeg = await JpegFrameStreamer.renderPageToJpeg(
           page: mk10Page,
           authoringInLandscape: true,

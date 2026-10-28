@@ -126,7 +126,7 @@ class CenterCanvasPanel extends StatelessWidget {
                                     child: InkWell(
                                       key: Key('lcd_key_$i'),
                                       borderRadius: BorderRadius.circular(
-                                        Sk18Geometry.cornerRadius * scaleX,
+                                        spec.cornerRadius * scaleX,
                                       ),
                                       onTap: () =>
                                           viewModel.handleCanvasKeyTap(i),
